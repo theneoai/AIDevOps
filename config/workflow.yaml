@@ -1,0 +1,170 @@
+workflow:
+  name: dev_to_qa
+  version: "1.0"
+  description: "研发提测 (Dev-to-QA handoff) automated workflow"
+
+states:
+  - CODING
+  - PR_CREATED
+  - CODE_REVIEW
+  - BUILD_TEST
+  - SUBMIT_TEST_TICKET
+  - QA_ASSIGNED
+  - TESTING
+  - BUG_FIXING
+  - RETEST
+  - APPROVED
+  - RELEASED
+  - FAILED
+  - CANCELLED
+
+transitions:
+  - from: CODING
+    event: pr_created
+    to: PR_CREATED
+
+  - from: PR_CREATED
+    event: review_requested
+    to: CODE_REVIEW
+
+  - from: CODE_REVIEW
+    event: review_approved
+    to: BUILD_TEST
+
+  - from: CODE_REVIEW
+    event: review_rejected
+    to: CODING
+
+  - from: BUILD_TEST
+    event: build_passed
+    to: SUBMIT_TEST_TICKET
+
+  - from: BUILD_TEST
+    event: build_failed
+    to: CODING
+
+  - from: SUBMIT_TEST_TICKET
+    event: ticket_submitted
+    to: QA_ASSIGNED
+
+  - from: QA_ASSIGNED
+    event: testing_started
+    to: TESTING
+
+  - from: TESTING
+    event: bugs_found
+    to: BUG_FIXING
+
+  - from: TESTING
+    event: testing_passed
+    to: APPROVED
+
+  - from: BUG_FIXING
+    event: bugs_fixed
+    to: RETEST
+
+  - from: RETEST
+    event: retest_passed
+    to: APPROVED
+
+  - from: RETEST
+    event: retest_failed
+    to: BUG_FIXING
+
+  - from: APPROVED
+    event: release_approved
+    to: RELEASED
+
+human_checkpoints:
+  - state: CODE_REVIEW
+    description: "Code review approval by tech lead or senior developer"
+    approvers:
+      - tech_lead
+      - senior_dev
+    timeout_hours: 24
+    action_on_timeout: escalate
+
+  - state: QA_ASSIGNED
+    description: "QA lead confirms assignment and testing readiness"
+    approvers:
+      - qa_lead
+    timeout_hours: 4
+    action_on_timeout: auto_assign_default
+
+  - state: APPROVED
+    description: "Final release approval by QA lead and product owner"
+    approvers:
+      - qa_lead
+      - product_owner
+    timeout_hours: 8
+    action_on_timeout: escalate
+
+agents:
+  dev_agent:
+    model: claude-sonnet-4-6
+    mcp_servers:
+      - github_workflow
+    capabilities:
+      - code_analysis
+      - test_ticket_generation
+      - bug_response
+
+  qa_agent:
+    model: claude-sonnet-4-6
+    mcp_servers:
+      - test_management
+      - github_workflow
+    capabilities:
+      - ticket_review
+      - test_plan_generation
+      - bug_reporting
+      - release_approval
+
+  reviewer_agent:
+    model: claude-sonnet-4-6
+    mcp_servers:
+      - github_workflow
+    capabilities:
+      - code_review
+      - security_check
+      - pr_approval
+
+  ops_agent:
+    model: claude-sonnet-4-6
+    mcp_servers:
+      - github_workflow
+    capabilities:
+      - build_monitoring
+      - deployment
+      - environment_setup
+
+skills:
+  code_analysis:
+    model: claude-sonnet-4-6
+    description: "Analyze PR diffs and assess risk level"
+
+  test_case_gen:
+    model: claude-sonnet-4-6
+    description: "Generate comprehensive test cases from change analysis"
+    default_count: 8
+
+  ticket_gen:
+    model: claude-sonnet-4-6
+    description: "Generate structured test tickets"
+    default_deadline_days: 2
+
+  notification:
+    channels:
+      - type: console
+        enabled: true
+      - type: webhook
+        enabled: false
+        url: ""
+        webhook_type: "slack"
+
+settings:
+  max_bug_fix_iterations: 3
+  auto_approve_in_demo: false
+  default_qa_assignee: "qa_engineer_1"
+  test_environment: "staging"
+  log_level: "INFO"

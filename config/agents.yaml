@@ -1,0 +1,116 @@
+agents:
+  dev_agent:
+    role: dev_agent
+    model: claude-sonnet-4-6
+    description: "Expert software developer responsible for code analysis and test ticket generation"
+    mcp_servers:
+      - name: github_workflow
+        command: python
+        args:
+          - mcp_servers/github_workflow/server.py
+        env:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    system_prompt_key: DEV_SYSTEM_PROMPT
+    max_tokens: 4096
+    temperature: 0.7
+
+  qa_agent:
+    role: qa_agent
+    model: claude-sonnet-4-6
+    description: "Expert QA engineer responsible for testing, bug reporting, and release approval"
+    mcp_servers:
+      - name: test_management
+        command: python
+        args:
+          - mcp_servers/test_management/server.py
+      - name: github_workflow
+        command: python
+        args:
+          - mcp_servers/github_workflow/server.py
+        env:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    system_prompt_key: QA_SYSTEM_PROMPT
+    max_tokens: 4096
+    temperature: 0.7
+
+  reviewer_agent:
+    role: reviewer_agent
+    model: claude-sonnet-4-6
+    description: "Expert code reviewer who evaluates PR quality and security"
+    mcp_servers:
+      - name: github_workflow
+        command: python
+        args:
+          - mcp_servers/github_workflow/server.py
+        env:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    system_prompt_key: REVIEWER_SYSTEM_PROMPT
+    max_tokens: 4096
+    temperature: 0.5
+
+  ops_agent:
+    role: ops_agent
+    model: claude-sonnet-4-6
+    description: "DevOps engineer responsible for builds, deployments, and environment management"
+    mcp_servers:
+      - name: github_workflow
+        command: python
+        args:
+          - mcp_servers/github_workflow/server.py
+        env:
+          GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    system_prompt_key: OPS_SYSTEM_PROMPT
+    max_tokens: 4096
+    temperature: 0.5
+
+mcp_servers:
+  github_workflow:
+    name: github_workflow
+    description: "GitHub PR management - fetch info, diffs, add comments, update status"
+    command: python
+    args:
+      - mcp_servers/github_workflow/server.py
+    env:
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    tools:
+      - get_pr_info
+      - get_pr_diff
+      - add_pr_comment
+      - update_pr_status
+      - list_changed_files
+      - get_pr_comments
+      - get_pr_status
+
+  test_management:
+    name: test_management
+    description: "Test management system - tickets, results, bugs, reports"
+    command: python
+    args:
+      - mcp_servers/test_management/server.py
+    tools:
+      - create_test_ticket
+      - assign_ticket
+      - update_ticket_status
+      - add_test_result
+      - list_bugs
+      - generate_test_report
+      - get_ticket
+      - list_tickets
+      - close_bug
+
+environment:
+  required_env_vars:
+    - name: ANTHROPIC_API_KEY
+      description: "Anthropic API key for Claude access"
+      required: true
+    - name: GITHUB_TOKEN
+      description: "GitHub personal access token (optional - enables real GitHub API)"
+      required: false
+
+  optional_env_vars:
+    - name: NOTIFICATION_WEBHOOK_URL
+      description: "Webhook URL for Slack/DingTalk/WeChat notifications"
+    - name: NOTIFICATION_WEBHOOK_TYPE
+      description: "Webhook type: slack, dingtalk, wecom, generic"
+    - name: DEFAULT_QA_ASSIGNEE
+      description: "Default QA engineer username for ticket assignment"
