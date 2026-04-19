@@ -1,0 +1,36 @@
+apiVersion: dify.enterprise/v1
+kind: Tool
+metadata:
+  name: text-summarizer
+  description: "文本摘要生成工具"
+  icon: "📝"
+  version: "1.0.0"
+  author: "enterprise"
+  labels:
+    - text-processing
+spec:
+  type: api
+  protocol: openapi
+  server:
+    url: "http://enterprise-tool-service:3000"
+    timeout: 30
+  authentication:
+    type: none
+  endpoints:
+    - path: "/tools/summarize"
+      method: post
+      operationId: summarize
+      summary: "生成文本摘要"
+      inputs:
+        - name: text
+          type: string
+          required: true
+          description: "需要摘要的文本"
+        - name: max_length
+          type: number
+          required: false
+          default: 100
+      outputs:
+        - name: summary
+          type: string
+          description: "生成的摘要"

@@ -119,7 +119,7 @@ export interface ToolSpec {
   /** Protocol version or name */
   protocol?: string;
   /** Server base URL (for API tools) or MCP server identifier */
-  server?: string;
+  server?: string | { url: string; timeout?: number };
   /** Authentication configuration */
   authentication?: {
     type: 'none' | 'api_key' | 'bearer' | 'basic' | 'oauth2';
