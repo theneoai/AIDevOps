@@ -11,12 +11,6 @@
 
 version: "3.8"
 
-# 导入 Dify 官方编排（如果存在）
-# 用户需要先克隆 Dify 仓库:
-#   git clone https://github.com/langgenius/dify.git
-include:
-  - dify/docker/docker-compose.yaml  # Dify 官方服务（可选）
-
 services:
   # ─── 企业自研: 通用 Tool 服务 ───
   enterprise-tool-service:
