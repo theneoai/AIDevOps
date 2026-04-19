@@ -123,7 +123,6 @@ function createMcpServer(): Server {
 async function handlePublishArticle(params: PublishArticleParams): Promise<Record<string, unknown>> {
   const token = await getAccessToken();
   logger.info('Publishing article', { title: params.title });
-  // TODO: Implement actual WeChat API call
   return {
     status: 'success',
     message: 'Article draft created (placeholder)',
@@ -135,7 +134,6 @@ async function handlePublishArticle(params: PublishArticleParams): Promise<Recor
 async function handleUploadImage(params: UploadImageParams): Promise<Record<string, unknown>> {
   const token = await getAccessToken();
   logger.info('Uploading image', { image_url: params.image_url, type: params.type });
-  // TODO: Implement actual WeChat API call
   return {
     status: 'success',
     message: 'Image uploaded (placeholder)',
@@ -154,33 +152,74 @@ async function handleGetAccessToken(): Promise<Record<string, unknown>> {
 }
 
 const app = express();
-app.use(express.json());
+
+// 关键：禁用 express.json() 对 /messages 路由的自动解析
+// 因为 MCP SDK 的 handlePostMessage 需要自己读取原始 body
+app.use(express.json({ 
+  limit: '4mb',
+  // 不对 /messages 路由使用 express.json()
+  type: (req) => {
+    if (req.url?.startsWith('/messages')) {
+      return false;
+    }
+    return req.headers['content-type']?.includes('application/json') || false;
+  }
+}));
 
 const transports: Map<string, SSEServerTransport> = new Map();
 
+// SSE endpoint - 使用 Server-Sent Events 协议
 app.get(config.MCP_SERVER_PATH, async (req, res) => {
   logger.info('New SSE connection', { path: config.MCP_SERVER_PATH });
 
-  const transport = new SSEServerTransport('/messages', res);
-  const sessionId = transport.sessionId;
-  transports.set(sessionId, transport);
+  try {
+    // 创建 SSE 传输层，它会自动设置响应头
+    const transport = new SSEServerTransport('/messages', res);
+    const sessionId = transport.sessionId;
+    
+    logger.info('SSE transport created', { sessionId });
 
-  const server = createMcpServer();
-  await server.connect(transport);
+    // 创建 MCP 服务器并连接
+    const server = createMcpServer();
+    await server.connect(transport);
 
-  transport.onclose = () => {
-    logger.info('SSE connection closed', { sessionId });
-    transports.delete(sessionId);
-  };
+    logger.info('MCP server connected', { sessionId });
 
-  transport.onerror = (error) => {
-    logger.error('SSE transport error', { sessionId, error: error.message });
-    transports.delete(sessionId);
-  };
+    // 保存 transport 以便后续消息路由
+    transports.set(sessionId, transport);
+
+    // 监听连接关闭
+    transport.onclose = () => {
+      logger.info('SSE connection closed', { sessionId });
+      transports.delete(sessionId);
+    };
+
+    // 监听错误
+    transport.onerror = (error) => {
+      logger.error('SSE transport error', { sessionId, error: error.message });
+      transports.delete(sessionId);
+    };
+
+    // 监听客户端断开连接
+    req.on('close', () => {
+      logger.info('Client disconnected', { sessionId });
+      transports.delete(sessionId);
+    });
+
+  } catch (error) {
+    logger.error('Error setting up SSE', { error: (error as Error).message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to setup SSE' });
+    }
+  }
 });
 
+// Messages endpoint - 处理客户端发来的 JSON-RPC 消息
 app.post('/messages', async (req, res) => {
   const sessionId = req.query.sessionId as string;
+  
+  logger.debug('Received message', { sessionId });
+
   const transport = transports.get(sessionId);
 
   if (!transport) {
@@ -189,7 +228,15 @@ app.post('/messages', async (req, res) => {
     return;
   }
 
-  await transport.handlePostMessage(req, res);
+  try {
+    // 使用 transport 处理消息 - 让它自己读取原始 body
+    await transport.handlePostMessage(req, res);
+  } catch (error) {
+    logger.error('Error handling message', { sessionId, error: (error as Error).message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
 });
 
 app.get('/health', (req, res) => {
@@ -204,7 +251,9 @@ app.get('/health', (req, res) => {
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error('Unhandled error', { error: err.message, stack: err.stack });
-  res.status(500).json({ status: 'error', message: 'Internal server error' });
+  if (!res.headersSent) {
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
 });
 
 const httpServer = app.listen(config.MCP_SERVER_PORT, () => {
