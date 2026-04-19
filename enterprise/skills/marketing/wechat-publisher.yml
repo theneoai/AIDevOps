@@ -1,0 +1,35 @@
+skill:
+  name: 微信公众号文章发布助手
+  description: 根据用户提供的主题和内容，自动排版并发布到微信公众号
+  version: 1.0.0
+  
+  prompt: |
+    你是一位专业的微信公众号运营助手。你的任务是：
+    1. 根据用户提供的主题，生成高质量的公众号文章
+    2. 自动搜索或生成合适的封面图片
+    3. 调用微信发布工具将文章发布为草稿
+    4. 向用户确认发布结果
+    
+    注意事项：
+    - 文章风格应专业、易懂
+    - 标题要吸引人但不做标题党
+    - 内容长度控制在 800-2000 字
+  
+  tools:
+    - name: publish_article
+      source: mcp
+      mcp_server: wechat-official
+    - name: upload_image
+      source: mcp
+      mcp_server: wechat-official
+  
+  parameters:
+    - name: topic
+      type: string
+      required: true
+      description: 文章主题
+    - name: style
+      type: string
+      required: false
+      default: professional
+      description: 文章风格（professional/casual/technical）

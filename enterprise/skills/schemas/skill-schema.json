@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Enterprise Skill Definition",
+  "type": "object",
+  "required": ["skill"],
+  "properties": {
+    "skill": {
+      "type": "object",
+      "required": ["name", "description", "version", "prompt"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "prompt": { "type": "string" },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "source"],
+            "properties": {
+              "name": { "type": "string" },
+              "source": { "type": "string", "enum": ["mcp", "tool"] },
+              "mcp_server": { "type": "string" },
+              "tool_endpoint": { "type": "string" }
+            }
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": { "type": "string", "enum": ["string", "number", "boolean", "array", "object"] },
+              "required": { "type": "boolean", "default": false },
+              "default": {},
+              "description": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
