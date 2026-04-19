@@ -63,3 +63,7 @@ echo -e "${GREEN}✓ Created enterprise directories${NC}"
 
 echo ""
 echo -e "${GREEN}Initialization complete!${NC}"
+echo ""
+echo "Next steps:"
+echo "  1. Edit .env file with your configuration"
+echo "  2. Run: make up-all"

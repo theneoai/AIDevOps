@@ -1,4 +1,4 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools
 
 # ─── 初始化 ───
 init:
@@ -38,6 +38,13 @@ restart:
 clean:
 	@docker-compose down -v --rmi local
 
+# ─── 工具注册 ───
+register-tools:
+	@echo "=== 注册企业自研工具到 Dify ==="
+	@docker cp enterprise/scripts/register-tools.py docker-api-1:/tmp/register-tools.py
+	@docker exec docker-api-1 python3 /tmp/register-tools.py
+	@echo "✓ 工具注册完成"
+
 # ─── Dify 官方服务 ───
 dify-up:
 	@echo "=== 启动 Dify 官方服务 ==="
@@ -52,6 +59,9 @@ dify-up:
 	@docker network connect docker_default mcp-wechat 2>/dev/null || true
 	@docker network connect docker_default enterprise-tool-service 2>/dev/null || true
 	@echo "✓ 企业自研服务已连接到 Dify 网络"
+	@echo "=== 自动注册企业自研工具到 Dify ==="
+	@sleep 10
+	@$(MAKE) register-tools 2>/dev/null || echo "⚠️  工具注册失败，请手动运行: make register-tools"
 
 dify-down:
 	@echo "=== 停止 Dify 官方服务 ==="
@@ -67,6 +77,10 @@ up-all: dify-up up
 	@echo "Dify API:    http://localhost:5001"
 	@echo "Tool Service: http://localhost:3100"
 	@echo "MCP WeChat:   http://localhost:3001"
+	@echo ""
+	@echo "企业自研工具已自动注册到 Dify，无需手动配置"
+	@echo "刷新 Dify UI 即可在 Tools 中看到："
+	@echo "  - 微信公众号发布 (MCP)"
 
 down-all: down dify-down
 	@echo "=== 全部服务已停止 ==="
