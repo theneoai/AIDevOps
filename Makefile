@@ -1,34 +1,24 @@
-.PHONY: init build up down logs status health restart clean
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down
 
+# ─── 初始化 ───
 init:
 	@test -f .env || cp .env.example .env
-	docker network inspect dify-network >/dev/null 2>&1 || docker network create dify-network
+	@docker network inspect dify-network >/dev/null 2>&1 || docker network create dify-network
+	@echo "=== 初始化完成 ==="
+	@echo "下一步:"
+	@echo "  1. 编辑 .env 文件，填写必要的配置"
+	@echo "  2. 运行: make up-all"
 
+# ─── 构建 ───
 build:
 	@docker-compose build
 
+# ─── 企业自研服务 ───
 up:
 	@docker-compose up -d
 
 down:
 	@docker-compose down 2>/dev/null || true
-
-# 启动全部服务（包括 Dify）
-up-all:
-	@echo "=== 启动 Dify + 企业自研服务 ==="
-	@if [ ! -d "dify" ]; then \
-		echo "⚠️  dify/ 目录不存在，请先运行: git clone https://github.com/langgenius/dify.git"; \
-		exit 1; \
-	fi
-	@docker-compose -f dify/docker/docker-compose.yaml -f docker-compose.yml up -d
-
-# 停止全部服务
-down-all:
-	@echo "=== 停止全部服务 ==="
-	@if [ -d "dify" ]; then \
-		docker-compose -f dify/docker/docker-compose.yaml -f docker-compose.yml down; \
-	fi
-	@docker-compose down
 
 logs:
 	@docker-compose logs -f
@@ -47,3 +37,36 @@ restart:
 
 clean:
 	@docker-compose down -v --rmi local
+
+# ─── Dify 官方服务 ───
+dify-up:
+	@echo "=== 启动 Dify 官方服务 ==="
+	@if [ ! -d "dify/docker" ]; then \
+		echo "⚠️  dify/ 子模块未初始化"; \
+		echo "请先运行: git submodule update --init --recursive"; \
+		exit 1; \
+	fi
+	@cd dify/docker && docker-compose up -d
+	@echo "=== 连接 Dify 到企业网络 ==="
+	@sleep 5
+	@docker network connect dify-network docker-nginx-1 2>/dev/null || true
+	@docker network connect dify-network docker-api-1 2>/dev/null || true
+	@echo "✓ Dify 已连接到 dify-network"
+
+dify-down:
+	@echo "=== 停止 Dify 官方服务 ==="
+	@if [ -d "dify/docker" ]; then \
+		cd dify/docker && docker-compose down; \
+	fi
+
+# ─── 全部服务（Dify + 企业自研）───
+up-all: dify-up up
+	@echo ""
+	@echo "=== 全部服务已启动 ==="
+	@echo "Dify 控制台: http://localhost/install"
+	@echo "Dify API:    http://localhost:5001"
+	@echo "Tool Service: http://localhost:3100"
+	@echo "MCP WeChat:   http://localhost:3001"
+
+down-all: down dify-down
+	@echo "=== 全部服务已停止 ==="

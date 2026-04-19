@@ -91,39 +91,73 @@ cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-your-servic
 | 命令 | 说明 |
 |------|------|
 | `make init` | 初始化项目 |
-| `make build` | 构建全部服务 |
-| `make up` | 启动全部服务 |
-| `make down` | 停止全部服务 |
-| `make logs` | 查看日志 |
-| `make status` | 查看服务状态 |
+| `make build` | 构建企业自研服务 |
+| `make up` | 启动企业自研服务 |
+| `make down` | 停止企业自研服务 |
+| `make dify-up` | 启动 Dify 官方服务 |
+| `make dify-down` | 停止 Dify 官方服务 |
+| `make up-all` | 启动全部服务（Dify + 企业自研） |
+| `make down-all` | 停止全部服务 |
+| `make logs` | 查看企业自研服务日志 |
+| `make status` | 查看企业自研服务状态 |
 | `make health` | 健康检查 |
-| `make restart` | 重启服务 |
+| `make restart` | 重启企业自研服务 |
 | `make clean` | 清理容器和镜像 |
 
 ## 与 Dify 集成
 
-### 方式一：统一编排（推荐）
+Dify 作为 Git 子模块引入，位于 `dify/` 目录。
 
-将 Dify 官方编排与企业自研编排合并启动：
+### 首次克隆
 
 ```bash
-# 1. 克隆 Dify 官方仓库
-git clone https://github.com/langgenius/dify.git
+# 克隆主仓库（包含子模块）
+git clone --recursive <your-repo-url>
 
-# 2. 启动全部服务（Dify + 企业自研）
-make up
-# 或
-docker-compose up -d
+# 如果已克隆但未初始化子模块
+git submodule update --init --recursive
 ```
 
-### 方式二：独立部署
+### 启动全部服务
 
-如果 Dify 已独立部署，只需确保：
-1. Dify 和企业自研服务在同一个 Docker 网络 `dify-network`
-2. 在 Dify 中配置 MCP Server 和 HTTP Tool
-3. 创建 Agent 应用，启用对应的 Tool 和 MCP
+```bash
+# 启动 Dify + 企业自研服务
+make up-all
 
-### Dify 服务访问
+# 仅启动企业自研服务
+make up
+
+# 仅启动 Dify
+make dify-up
+```
+
+### 停止服务
+
+```bash
+# 停止全部服务
+make down-all
+
+# 仅停止企业自研服务
+make down
+
+# 仅停止 Dify
+make dify-down
+```
+
+### Dify 中配置企业自研服务
+
+1. **配置 MCP Server**
+   - 进入 Dify → Tools → MCP
+   - 添加 MCP Server (HTTP)
+   - Server URL: `http://mcp-wechat:3000/sse`
+   - Name: `微信公众号发布`
+
+2. **配置 HTTP Tool**
+   - 进入 Dify → Tools → Custom
+   - 添加 HTTP API
+   - URL: `http://enterprise-tool-service:3000/...`
+
+### 服务访问地址
 
 | 服务 | 地址 |
 |------|------|

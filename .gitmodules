@@ -1,3 +1,5 @@
 [submodule "dify"]
 	path = dify
 	url = https://github.com/langgenius/dify.git
+	branch = main
+	shallow = true
