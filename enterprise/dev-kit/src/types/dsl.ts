@@ -152,8 +152,318 @@ export interface ToolDSL {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Workflow DSL Types
+// ─────────────────────────────────────────────────────────────
+
+/** Variable reference in a workflow, e.g. "{{inputs.topic}}" or a static value */
+export type WorkflowVarRef = string;
+
+export interface WorkflowInput {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'integer' | 'array' | 'object' | 'file';
+  required?: boolean;
+  description?: string;
+  default?: unknown;
+}
+
+export interface WorkflowOutput {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'integer' | 'array' | 'object' | 'file';
+  description?: string;
+  /** Variable reference that maps to this output, e.g. "{{steps.llm.output}}" */
+  value: WorkflowVarRef;
+}
+
+// ── Step Definitions ─────────────────────────────────────────
+
+export interface LLMStepConfig {
+  /** Model provider, e.g. "openai" or "anthropic" */
+  provider?: string;
+  /** Model name, e.g. "gpt-4o" or "claude-sonnet-4-6" */
+  model?: string;
+  /** System prompt (supports {{var}} interpolation) */
+  systemPrompt?: string;
+  /** User prompt template */
+  prompt: WorkflowVarRef;
+  /** Max tokens */
+  maxTokens?: number;
+  /** Temperature (0-2) */
+  temperature?: number;
+  /** Output variable name (defaults to step id) */
+  outputVariable?: string;
+}
+
+export interface ToolStepConfig {
+  /** Tool reference: "ref:<provider>.<operationId>" or "builtin:<name>" */
+  tool: string;
+  /** Input mappings: key → variable reference or literal */
+  inputs: Record<string, WorkflowVarRef>;
+  /** Output variable name */
+  outputVariable?: string;
+}
+
+export interface ConditionBranch {
+  /** Condition expression, e.g. "{{steps.classify.output}} == 'tech'" */
+  condition: string;
+  /** Steps to execute when condition is true */
+  steps: WorkflowStep[];
+}
+
+export interface ConditionStepConfig {
+  branches: ConditionBranch[];
+  /** Default branch steps when no condition matches */
+  default?: WorkflowStep[];
+}
+
+export interface IterationStepConfig {
+  /** Collection variable reference, e.g. "{{inputs.items}}" */
+  over: WorkflowVarRef;
+  /** Variable name for current item */
+  itemVariable: string;
+  /** Steps to execute per iteration */
+  steps: WorkflowStep[];
+  /** Max concurrency for parallel iteration */
+  concurrency?: number;
+}
+
+export interface CodeStepConfig {
+  /** Supported runtime */
+  runtime: 'python3' | 'nodejs';
+  /** Inline code (use | in YAML for multiline) */
+  code: string;
+  /** Input variable bindings */
+  inputs: Record<string, WorkflowVarRef>;
+  /** Output variable name */
+  outputVariable?: string;
+}
+
+export interface KnowledgeRetrievalStepConfig {
+  /** Knowledge base reference: "ref:<knowledge-base-name>" */
+  knowledgeBase: string;
+  /** Query variable reference */
+  query: WorkflowVarRef;
+  /** Number of results to retrieve */
+  topK?: number;
+  /** Score threshold (0-1) */
+  scoreThreshold?: number;
+  /** Output variable name */
+  outputVariable?: string;
+}
+
+/** Human-in-the-Loop approval step */
+export interface HITLStepConfig {
+  /** Notification channel: "slack", "email", "webhook" */
+  channel: 'slack' | 'email' | 'webhook';
+  /** Message to display to the approver (supports {{var}} interpolation) */
+  message: WorkflowVarRef;
+  /** Timeout in seconds before auto-action */
+  timeoutSeconds?: number;
+  /** Action when timeout is reached: "approve" | "reject" | "error" */
+  onTimeout?: 'approve' | 'reject' | 'error';
+  /** Webhook URL for channel === 'webhook' */
+  webhookUrl?: string;
+  /** Slack channel for channel === 'slack' */
+  slackChannel?: string;
+  /** Email recipients for channel === 'email' */
+  emailRecipients?: string[];
+  /** Output variable name for the approval decision */
+  outputVariable?: string;
+}
+
+export interface AgentStepConfig {
+  /** Agent reference: "ref:<agent-name>" */
+  agent: string;
+  /** Input variable mappings */
+  inputs: Record<string, WorkflowVarRef>;
+  /** Output variable name */
+  outputVariable?: string;
+}
+
+export type WorkflowStepKind =
+  | 'llm'
+  | 'tool'
+  | 'condition'
+  | 'iteration'
+  | 'code'
+  | 'knowledge'
+  | 'hitl'
+  | 'agent';
+
+export interface WorkflowStep {
+  /** Step identifier (unique within the workflow) */
+  id: string;
+  /** Human-readable step name */
+  name?: string;
+  /** Step type */
+  kind: WorkflowStepKind;
+  /** Dependencies (other step ids that must complete first) */
+  dependsOn?: string[];
+  /** Step-specific configuration */
+  config: LLMStepConfig | ToolStepConfig | ConditionStepConfig | IterationStepConfig | CodeStepConfig | KnowledgeRetrievalStepConfig | HITLStepConfig | AgentStepConfig;
+}
+
+export interface WorkflowSpec {
+  /** Workflow-level inputs */
+  inputs?: WorkflowInput[];
+  /** Workflow-level outputs */
+  outputs?: WorkflowOutput[];
+  /** Ordered steps (dependency graph is derived from dependsOn + order) */
+  steps: WorkflowStep[];
+  /** Error handling strategy */
+  onError?: 'stop' | 'continue' | 'retry';
+  /** Max retry count on transient errors */
+  maxRetries?: number;
+  /** Timeout in seconds for the entire workflow */
+  timeoutSeconds?: number;
+}
+
+export interface WorkflowDSL {
+  apiVersion: string;
+  kind: 'Workflow';
+  metadata: DSLMetadata;
+  spec: WorkflowSpec;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Agent DSL Types
+// ─────────────────────────────────────────────────────────────
+
+export interface AgentMemoryConfig {
+  /** Memory strategy */
+  type: 'conversation' | 'knowledge' | 'none';
+  /** Max conversation turns to retain */
+  windowSize?: number;
+  /** Knowledge base references */
+  knowledgeBases?: string[];
+}
+
+export interface AgentGuardrail {
+  /** Type of guardrail */
+  type: 'content_filter' | 'sensitive_info' | 'length_limit' | 'custom';
+  /** Applies to input, output, or both */
+  applies: 'input' | 'output' | 'both';
+  /** Custom instructions for guardrail behavior */
+  instructions?: string;
+  /** Max token length (for length_limit) */
+  maxTokens?: number;
+}
+
+export interface AgentToolBinding {
+  /** Tool reference: "ref:<provider>.<operationId>" or "builtin:<name>" */
+  ref: string;
+  /** Override display name */
+  name?: string;
+  /** Override description */
+  description?: string;
+}
+
+export interface AgentSpec {
+  /** LLM model configuration */
+  model?: {
+    provider?: string;
+    name?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+  /** Agent system prompt (the agent's persona and instructions) */
+  systemPrompt: string;
+  /** Tools available to this agent */
+  tools?: AgentToolBinding[];
+  /** Memory configuration */
+  memory?: AgentMemoryConfig;
+  /** Guardrails for safety */
+  guardrails?: AgentGuardrail[];
+  /** Opening statement shown to users */
+  openingStatement?: string;
+  /** Suggested first-turn questions */
+  suggestedQuestions?: string[];
+  /** Max agent iterations before stopping */
+  maxIterations?: number;
+}
+
+export interface AgentDSL {
+  apiVersion: string;
+  kind: 'Agent';
+  metadata: DSLMetadata;
+  spec: AgentSpec;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Multi-Agent Orchestration DSL Types
+// ─────────────────────────────────────────────────────────────
+
+export type AgentRole = 'supervisor' | 'worker' | 'critic' | 'planner' | 'executor';
+
+export interface OrchestrationAgentConfig {
+  /** Reference to an AgentDSL file: "ref:<agent-name>" */
+  ref: string;
+  /** Role in the multi-agent team */
+  role: AgentRole;
+  /** Display name override */
+  name?: string;
+}
+
+export interface OrchestrationSpec {
+  /** Team of agents */
+  agents: OrchestrationAgentConfig[];
+  /** Coordination strategy */
+  strategy: 'supervisor' | 'round_robin' | 'parallel' | 'sequential';
+  /** Supervisor agent ref (required when strategy === 'supervisor') */
+  supervisor?: string;
+  /** Max rounds of agent interaction */
+  maxRounds?: number;
+  /** Shared context variables */
+  sharedContext?: Record<string, unknown>;
+  /** Output format */
+  outputFormat?: 'last_agent' | 'aggregated' | 'supervisor_decision';
+}
+
+export interface OrchestrationDSL {
+  apiVersion: string;
+  kind: 'Orchestration';
+  metadata: DSLMetadata;
+  spec: OrchestrationSpec;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Chatflow DSL Types
+// ─────────────────────────────────────────────────────────────
+
+export interface ChatflowSpec {
+  /** Underlying agent reference */
+  agent?: string;
+  /** System prompt */
+  systemPrompt?: string;
+  /** Model configuration */
+  model?: {
+    provider?: string;
+    name?: string;
+    temperature?: number;
+  };
+  /** Knowledge bases for retrieval */
+  knowledgeBases?: string[];
+  /** Opening statement */
+  openingStatement?: string;
+  /** Suggested questions */
+  suggestedQuestions?: string[];
+  /** Workflow triggered on each user message */
+  preprocessWorkflow?: string;
+}
+
+export interface ChatflowDSL {
+  apiVersion: string;
+  kind: 'Chatflow';
+  metadata: DSLMetadata;
+  spec: ChatflowSpec;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Union Component DSL
 // ─────────────────────────────────────────────────────────────
 
-/** Union of all supported component DSL shapes. Currently only ToolDSL is defined. */
-export type ComponentDSL = ToolDSL;
+export type ComponentDSL =
+  | ToolDSL
+  | WorkflowDSL
+  | AgentDSL
+  | OrchestrationDSL
+  | ChatflowDSL;
