@@ -13,6 +13,23 @@ up:
 down:
 	@docker-compose down
 
+# 启动全部服务（包括 Dify）
+up-all:
+	@echo "=== 启动 Dify + 企业自研服务 ==="
+	@if [ ! -d "dify" ]; then \
+		echo "⚠️  dify/ 目录不存在，请先运行: git clone https://github.com/langgenius/dify.git"; \
+		exit 1; \
+	fi
+	@docker-compose -f dify/docker/docker-compose.yaml -f docker-compose.yml up -d
+
+# 停止全部服务
+down-all:
+	@echo "=== 停止全部服务 ==="
+	@if [ -d "dify" ]; then \
+		docker-compose -f dify/docker/docker-compose.yaml -f docker-compose.yml down; \
+	fi
+	@docker-compose down
+
 logs:
 	@docker-compose logs -f
 

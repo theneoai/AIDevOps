@@ -1,9 +1,28 @@
+# ==================================================================
+# Dify + Enterprise Agent Framework 统一编排
+# ==================================================================
+# 使用方式:
+#   1. 克隆 Dify 官方仓库到 dify/ 目录（或独立部署）
+#   2. 确保 Dify 使用网络 dify-network
+#   3. 运行: docker-compose up -d
+#
+# 注意: Dify 官方服务通过 Docker Compose include 导入
+# ==================================================================
+
 version: "3.8"
 
+# 导入 Dify 官方编排（如果存在）
+# 用户需要先克隆 Dify 仓库:
+#   git clone https://github.com/langgenius/dify.git
+include:
+  - dify/docker/docker-compose.yaml  # Dify 官方服务（可选）
+
 services:
+  # ─── 企业自研: 通用 Tool 服务 ───
   enterprise-tool-service:
     build:
       context: ./enterprise/tool-service
+    container_name: enterprise-tool-service
     ports:
       - "3100:3000"
     environment:
@@ -20,9 +39,11 @@ services:
       retries: 3
       start_period: 10s
 
+  # ─── 企业自研: 微信公众号 MCP ───
   mcp-wechat:
     build:
       context: ./enterprise/mcp-servers/mcp-wechat
+    container_name: mcp-wechat
     ports:
       - "3001:3000"
     environment:
@@ -42,6 +63,8 @@ services:
       retries: 3
       start_period: 10s
 
+# 统一网络（与 Dify 共享）
 networks:
   dify-network:
     driver: bridge
+    name: dify-network  # 固定名称，便于 Dify 和企业服务共享

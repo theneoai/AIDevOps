@@ -102,10 +102,35 @@ cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-your-servic
 
 ## 与 Dify 集成
 
-1. 启动 Dify 官方服务（参考 Dify 文档）
-2. 确保 Dify 和企业自研服务在同一个 Docker 网络 `dify-network`
-3. 在 Dify 中配置 MCP Server 和 HTTP Tool
-4. 创建 Agent 应用，启用对应的 Tool 和 MCP
+### 方式一：统一编排（推荐）
+
+将 Dify 官方编排与企业自研编排合并启动：
+
+```bash
+# 1. 克隆 Dify 官方仓库
+git clone https://github.com/langgenius/dify.git
+
+# 2. 启动全部服务（Dify + 企业自研）
+make up
+# 或
+docker-compose up -d
+```
+
+### 方式二：独立部署
+
+如果 Dify 已独立部署，只需确保：
+1. Dify 和企业自研服务在同一个 Docker 网络 `dify-network`
+2. 在 Dify 中配置 MCP Server 和 HTTP Tool
+3. 创建 Agent 应用，启用对应的 Tool 和 MCP
+
+### Dify 服务访问
+
+| 服务 | 地址 |
+|------|------|
+| Dify 控制台 | http://localhost/install |
+| Dify API | http://localhost:5001 |
+| 企业 Tool Service | http://localhost:3100 |
+| 微信 MCP | http://localhost:3001/sse |
 
 ## 许可证
 
