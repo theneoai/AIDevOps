@@ -47,11 +47,11 @@ dify-up:
 		exit 1; \
 	fi
 	@cd dify/docker && docker-compose up -d
-	@echo "=== 连接 Dify 到企业网络 ==="
+	@echo "=== 连接企业服务到 Dify 网络 ==="
 	@sleep 5
-	@docker network connect dify-network docker-nginx-1 2>/dev/null || true
-	@docker network connect dify-network docker-api-1 2>/dev/null || true
-	@echo "✓ Dify 已连接到 dify-network"
+	@docker network connect docker_default mcp-wechat 2>/dev/null || true
+	@docker network connect docker_default enterprise-tool-service 2>/dev/null || true
+	@echo "✓ 企业自研服务已连接到 Dify 网络"
 
 dify-down:
 	@echo "=== 停止 Dify 官方服务 ==="
