@@ -1,6 +1,6 @@
 {
   "name": "@dify/dev-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dify DevKit - CLI tool for creating Dify components via code",
   "main": "dist/index.js",
   "bin": {
@@ -10,6 +10,7 @@
     "build": "tsc",
     "dev": "ts-node src/cli.ts",
     "test": "jest",
+    "test:integration": "jest --testPathPattern=integration --runInBand",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit"
   },

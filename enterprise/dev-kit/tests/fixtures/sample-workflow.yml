@@ -1,0 +1,140 @@
+apiVersion: dify.dev/v1
+kind: Workflow
+metadata:
+  name: marketing-content-pipeline
+  description: Automated content generation pipeline for WeChat articles
+  version: 1.0.0
+  author: content-team
+  labels:
+    - marketing
+    - wechat
+    - content
+
+spec:
+  inputs:
+    - name: topic
+      type: string
+      required: true
+      description: The article topic
+
+    - name: target_audience
+      type: string
+      required: false
+      description: Target reader persona
+      default: general
+
+    - name: word_count
+      type: integer
+      required: false
+      description: Approximate word count
+      default: 800
+
+  outputs:
+    - name: article_url
+      type: string
+      description: Published WeChat article URL
+      value: "{{steps.publish.article_url}}"
+
+    - name: article_title
+      type: string
+      description: Final article title
+      value: "{{steps.write_article.title}}"
+
+  steps:
+    - id: research
+      name: Research Topic
+      kind: knowledge
+      config:
+        knowledgeBase: ref:industry-knowledge-base
+        query: "{{inputs.topic}}"
+        topK: 5
+        scoreThreshold: 0.6
+        outputVariable: research_results
+
+    - id: write_article
+      name: Draft Article
+      kind: llm
+      dependsOn: [research]
+      config:
+        provider: anthropic
+        model: claude-sonnet-4-6
+        systemPrompt: |
+          You are an expert content writer specializing in technology articles for Chinese business professionals.
+          Write engaging, informative content that balances technical depth with accessibility.
+        prompt: |
+          Write a WeChat article about: {{inputs.topic}}
+          Target audience: {{inputs.target_audience}}
+          Approximate length: {{inputs.word_count}} words
+
+          Reference material:
+          {{steps.research.research_results}}
+
+          Include:
+          1. A compelling headline
+          2. Engaging introduction
+          3. 3-4 main sections with subheadings
+          4. Practical takeaways
+          5. Call to action
+        maxTokens: 3000
+        temperature: 0.7
+        outputVariable: article_draft
+
+    - id: review_content
+      name: Review & Improve
+      kind: llm
+      dependsOn: [write_article]
+      config:
+        model: claude-sonnet-4-6
+        systemPrompt: You are an expert editor. Review and improve the article for clarity, engagement, and SEO.
+        prompt: |
+          Review and improve this WeChat article:
+
+          {{steps.write_article.article_draft}}
+
+          Make it more engaging and ensure it meets WeChat article best practices.
+          Return the improved version.
+        outputVariable: refined_article
+
+    - id: approve_content
+      name: Human Review & Approval
+      kind: hitl
+      dependsOn: [review_content]
+      config:
+        channel: slack
+        slackChannel: "#content-review"
+        message: |
+          New article ready for review: {{inputs.topic}}
+
+          Preview: {{steps.review_content.refined_article}}
+
+          Please approve or reject this content.
+        timeoutSeconds: 7200
+        onTimeout: reject
+        outputVariable: approval_decision
+
+    - id: upload_images
+      name: Upload Cover Image
+      kind: tool
+      dependsOn: [approve_content]
+      config:
+        tool: ref:mcp-wechat.upload_image
+        inputs:
+          image_url: "https://picsum.photos/800/400"
+          type: "cover"
+        outputVariable: image_result
+
+    - id: publish
+      name: Publish to WeChat
+      kind: tool
+      dependsOn: [upload_images]
+      config:
+        tool: ref:mcp-wechat.publish_article
+        inputs:
+          title: "{{inputs.topic}} - Industry Insights"
+          content: "{{steps.review_content.refined_article}}"
+          cover_media_id: "{{steps.upload_images.media_id}}"
+          author: "AI Content Team"
+        outputVariable: article_url
+
+  onError: stop
+  timeoutSeconds: 14400

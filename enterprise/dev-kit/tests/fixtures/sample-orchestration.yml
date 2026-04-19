@@ -1,0 +1,46 @@
+apiVersion: dify.dev/v1
+kind: Orchestration
+metadata:
+  name: content-research-team
+  description: Multi-agent team for comprehensive content research and creation
+  version: 1.0.0
+  author: platform-team
+  labels:
+    - multi-agent
+    - research
+    - content
+
+spec:
+  strategy: supervisor
+
+  supervisor: ref:content-supervisor
+
+  agents:
+    - ref: ref:content-supervisor
+      role: supervisor
+      name: Content Supervisor
+
+    - ref: ref:research-specialist
+      role: worker
+      name: Research Specialist
+
+    - ref: ref:seo-analyst
+      role: worker
+      name: SEO Analyst
+
+    - ref: ref:content-writer
+      role: worker
+      name: Content Writer
+
+    - ref: ref:quality-reviewer
+      role: critic
+      name: Quality Reviewer
+
+  maxRounds: 8
+
+  sharedContext:
+    platform: wechat
+    language: zh-CN
+    style: professional
+
+  outputFormat: supervisor_decision
