@@ -6,6 +6,10 @@ services:
       context: ./enterprise/tool-service
     ports:
       - "3100:3000"
+    environment:
+      - SERVICE_PORT=3000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
     networks:
       - dify-network
     restart: unless-stopped
@@ -21,6 +25,13 @@ services:
       context: ./enterprise/mcp-servers/mcp-wechat
     ports:
       - "3001:3000"
+    environment:
+      - WECHAT_APP_ID=${WECHAT_APP_ID:-}
+      - WECHAT_APP_SECRET=${WECHAT_APP_SECRET:-}
+      - MCP_SERVER_PORT=3000
+      - MCP_SERVER_PATH=/sse
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
     networks:
       - dify-network
     restart: unless-stopped
