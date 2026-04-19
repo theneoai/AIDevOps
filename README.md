@@ -146,16 +146,47 @@ make dify-down
 
 ### Dify 中配置企业自研服务
 
-1. **配置 MCP Server**
+#### 方式一：开发 Dify 插件（推荐，功能完整）
+
+Dify 1.0+ 版本使用插件系统扩展功能。企业自研服务需要开发为 Dify 插件：
+
+1. **安装 Dify 插件 CLI**
+   ```bash
+   brew tap langgenius/dify
+   brew install dify
+   ```
+
+2. **创建 Tool 插件**
+   ```bash
+   cd enterprise/plugins
+   dify plugin init
+   # 选择 Tool 类型，配置 API 端点指向 enterprise-tool-service
+   ```
+
+3. **创建 MCP 插件**
+   ```bash
+   dify plugin init
+   # 选择 Tool 类型，配置 MCP Server 端点指向 mcp-wechat
+   ```
+
+4. **打包并安装到 Dify**
+   ```bash
+   dify plugin package ./your-plugin
+   # 在 Dify → Plugins → Install 中上传安装
+   ```
+
+#### 方式二：配置外部 API 工具（简单，功能受限）
+
+1. **配置 HTTP Tool**
+   - 进入 Dify → Tools → Custom
+   - 添加 HTTP API
+   - URL: `http://enterprise-tool-service:3000/...`
+
+2. **配置 MCP Server**
    - 进入 Dify → Tools → MCP
    - 添加 MCP Server (HTTP)
    - Server URL: `http://mcp-wechat:3000/sse`
    - Name: `微信公众号发布`
-
-2. **配置 HTTP Tool**
-   - 进入 Dify → Tools → Custom
-   - 添加 HTTP API
-   - URL: `http://enterprise-tool-service:3000/...`
 
 ### 服务访问地址
 
