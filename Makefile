@@ -11,7 +11,7 @@ up:
 	@docker-compose up -d
 
 down:
-	@docker-compose down
+	@docker-compose down 2>/dev/null || true
 
 # 启动全部服务（包括 Dify）
 up-all:
