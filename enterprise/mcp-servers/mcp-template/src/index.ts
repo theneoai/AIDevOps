@@ -47,10 +47,32 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.listen(config.MCP_SERVER_PORT, () => {
-  logger.info('MCP server started', {
-    port: config.MCP_SERVER_PORT,
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error', { error: err.message, stack: err.stack });
+  res.status(500).json({ status: 'error', message: 'Internal server error' });
+});
+
+const httpServer = app.listen(config.MCP_SERVER_PORT, () => {
+  logger.info(`MCP Server running on port ${config.MCP_SERVER_PORT}`, {
     path: config.MCP_SERVER_PATH,
-    env: config.NODE_ENV,
+    port: config.MCP_SERVER_PORT,
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  httpServer.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  httpServer.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
   });
 });
