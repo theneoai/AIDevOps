@@ -337,7 +337,7 @@ export function compileMCPTool(
   const toolsStr = buildToolsStr(dsl);
 
   return {
-    id: sha256(serverUrl),
+    id: userId,
     tenant_id: tenantId,
     name: dsl.metadata.name,
     label: dsl.metadata.name,

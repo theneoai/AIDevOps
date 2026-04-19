@@ -149,9 +149,9 @@ describe('compiler', () => {
       expect(config.tools[0].name).toBe('search');
     });
 
-    it('generates SHA-256 hash for id', () => {
+    it('uses userId as id', () => {
       const result = compileMCPTool(mcpDSL, 'tenant-1', 'user-1');
-      expect(result.id).toHaveLength(64);
+      expect(result.id).toBe('user-1');
     });
   });
 });

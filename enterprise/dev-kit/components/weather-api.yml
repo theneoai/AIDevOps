@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: weather-api
+  description: "查询全球城市天气信息"
+  icon: "🌤️"
+  version: "1.0.0"
+  author: "enterprise"
+  labels:
+    - "api"
+    - "weather"
+    - "enterprise"
+spec:
+  type: api
+  server: http://enterprise-tool-service:3000
+  authentication:
+    type: none
+  endpoints:
+    - path: /v1/weather/current
+      method: POST
+      operationId: getCurrentWeather
+      summary: "获取当前天气"
+      description: "根据城市名称获取当前天气状况"
+      inputs:
+        - name: city
+          type: string
+          required: true
+          description: "城市名称，如 Beijing、Shanghai"
+        - name: units
+          type: string
+          required: false
+          default: "metric"
+          description: "温度单位: metric(摄氏度) 或 imperial(华氏度)"
+          enum: ["metric", "imperial"]
+      outputs:
+        - name: temperature
+          type: number
+          description: "当前温度"
+        - name: humidity
+          type: number
+          description: "湿度百分比"
+        - name: condition
+          type: string
+          description: "天气状况描述"
+    - path: /v1/weather/forecast
+      method: POST
+      operationId: getWeatherForecast
+      summary: "获取天气预报"
+      description: "获取未来几天的天气预报"
+      inputs:
+        - name: city
+          type: string
+          required: true
+          description: "城市名称"
+        - name: days
+          type: integer
+          required: false
+          default: 3
+          description: "预报天数"
+      outputs:
+        - name: forecast
+          type: array
+          description: "天气预报列表"

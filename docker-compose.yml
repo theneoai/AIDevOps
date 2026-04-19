@@ -57,6 +57,26 @@ services:
       retries: 3
       start_period: 10s
 
+  # ─── 企业自研: DevKit CLI 工具 ───
+  devkit:
+    build:
+      context: ./enterprise/dev-kit
+    container_name: dify-devkit
+    volumes:
+      - ./enterprise/components:/app/components:ro
+      - ./enterprise/dev-kit/dify-dev.yaml:/app/dify-dev.yaml:ro
+    environment:
+      - DIFY_DB_HOST=${DIFY_DB_HOST:-db_postgres}
+      - DIFY_DB_PORT=${DIFY_DB_PORT:-5432}
+      - DIFY_DB_USER=${DIFY_DB_USER:-postgres}
+      - DIFY_DB_PASSWORD=${DIFY_DB_PASSWORD:-difyai123456}
+      - DIFY_DB_NAME=${DIFY_DB_NAME:-dify}
+    networks:
+      - dify-network
+    profiles:
+      - devkit
+    command: ["status"]
+
 # 统一网络（与 Dify 共享）
 networks:
   dify-network:

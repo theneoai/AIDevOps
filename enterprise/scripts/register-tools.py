@@ -21,6 +21,7 @@ import sys
 import json
 import hashlib
 import logging
+import base64
 from uuid import uuid4
 from datetime import datetime
 
@@ -38,6 +39,7 @@ ENTERPRISE_SERVICES = {
         'type': 'mcp',
         'url': 'http://mcp-wechat:3000/sse',
         'identifier': 'mcp-wechat',
+        'icon': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/wechat/wechat-original.svg',
         'tools': [
             {
                 'name': 'publish_article',
@@ -78,6 +80,15 @@ ENTERPRISE_SERVICES = {
                 }
             }
         ]
+    },
+    'enterprise-tool-service': {
+        'name': '企业通用工具服务',
+        'type': 'api',
+        'url': 'http://enterprise-tool-service:3000/openapi.json',
+        'identifier': 'enterprise-tool-service',
+        'icon': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg',
+        'schema_type': 'openapi',
+        'description': '企业自研通用工具服务，提供文本摘要、关键词提取等能力',
     }
 }
 
@@ -107,12 +118,13 @@ def get_default_tenant_and_user(conn):
     cur = conn.cursor()
     
     # 获取第一个 tenant
-    cur.execute("SELECT id FROM tenants LIMIT 1")
+    cur.execute("SELECT id, encrypt_public_key FROM tenants LIMIT 1")
     tenant_row = cur.fetchone()
     if not tenant_row:
         logger.error("No tenant found in database")
         sys.exit(1)
     tenant_id = tenant_row[0]
+    encrypt_public_key = tenant_row[1]
     
     # 获取第一个 admin 用户
     cur.execute("SELECT id FROM accounts LIMIT 1")
@@ -123,16 +135,68 @@ def get_default_tenant_and_user(conn):
     user_id = user_row[0]
     
     cur.close()
-    return tenant_id, user_id
+    return tenant_id, user_id, encrypt_public_key
 
 
-def register_mcp_provider(conn, tenant_id, user_id, service_config):
+def encrypt_server_url(server_url: str, public_key_pem: str) -> str:
+    """
+    使用 Dify 的混合加密方案加密 server_url
+    
+    算法:
+    1. 生成随机 16-byte AES 密钥
+    2. 使用 AES-128-EAX 加密 server_url
+    3. 使用 RSA-OAEP (SHA-1) 加密 AES 密钥
+    4. 拼接: b"HYBRID:" + rsa_encrypted_aes_key + nonce + tag + ciphertext
+    5. Base64 编码
+    """
+    try:
+        from Crypto.Cipher import AES, PKCS1_OAEP
+        from Crypto.PublicKey import RSA
+        from Crypto.Random import get_random_bytes
+        from Crypto.Hash import SHA1
+    except ImportError:
+        logger.error("pycryptodome not installed. Install with: pip install pycryptodome")
+        sys.exit(1)
+    
+    # 1. AES 加密
+    aes_key = get_random_bytes(16)
+    cipher_aes = AES.new(aes_key, AES.MODE_EAX)
+    ciphertext, tag = cipher_aes.encrypt_and_digest(server_url.encode())
+    
+    # 2. RSA 加密 AES 密钥
+    rsa_key = RSA.import_key(public_key_pem)
+    cipher_rsa = PKCS1_OAEP.new(rsa_key, hashAlgo=SHA1)
+    enc_aes_key = cipher_rsa.encrypt(aes_key)
+    
+    # 3. 构建混合载荷
+    prefix = b"HYBRID:"
+    payload = prefix + enc_aes_key + cipher_aes.nonce + tag + ciphertext
+    
+    # 4. Base64 编码
+    return base64.b64encode(payload).decode()
+
+
+def register_mcp_provider(conn, tenant_id, user_id, encrypt_public_key, service_config):
     """注册 MCP Provider"""
     cur = conn.cursor()
     
     identifier = service_config['identifier']
     server_url = service_config['url']
     server_url_hash = hashlib.sha256(server_url.encode()).hexdigest()
+    
+    # 加密 server_url
+    if encrypt_public_key:
+        try:
+            encrypted_server_url = encrypt_server_url(server_url, encrypt_public_key)
+            logger.info(f"Encrypted server_url for '{identifier}'")
+        except Exception as e:
+            logger.error(f"Failed to encrypt server_url: {e}")
+            # 如果没有公钥或加密失败，回退到明文存储（不推荐用于生产环境）
+            encrypted_server_url = server_url
+            logger.warning(f"Storing server_url in plaintext for '{identifier}' (not recommended for production)")
+    else:
+        logger.warning(f"No encrypt_public_key found for tenant {tenant_id}, storing server_url in plaintext")
+        encrypted_server_url = server_url
     
     # 检查是否已存在
     cur.execute(
@@ -143,31 +207,32 @@ def register_mcp_provider(conn, tenant_id, user_id, service_config):
     
     if existing:
         logger.info(f"MCP provider '{identifier}' already exists (id: {existing[0]})")
-        # 更新工具列表
+        # 更新工具列表和 server_url
         cur.execute(
-            "UPDATE tool_mcp_providers SET tools = %s, updated_at = NOW() WHERE id = %s",
-            (json.dumps(service_config['tools']), existing[0])
+            "UPDATE tool_mcp_providers SET tools = %s, server_url = %s, server_url_hash = %s, icon = %s, updated_at = NOW() WHERE id = %s",
+            (json.dumps(service_config['tools']), encrypted_server_url, server_url_hash, service_config.get('icon', 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/wechat/wechat-original.svg'), existing[0])
         )
         conn.commit()
-        logger.info(f"Updated MCP provider '{identifier}' tools")
+        logger.info(f"Updated MCP provider '{identifier}'")
         return existing[0]
     
     # 创建新的 provider
     provider_id = str(uuid4())
     cur.execute('''
         INSERT INTO tool_mcp_providers 
-        (id, name, server_identifier, server_url, server_url_hash, tenant_id, user_id, tools, authed)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (id, name, server_identifier, server_url, server_url_hash, tenant_id, user_id, tools, authed, icon)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ''', (
         provider_id,
         service_config['name'],
         identifier,
-        server_url,
+        encrypted_server_url,
         server_url_hash,
         tenant_id,
         user_id,
         json.dumps(service_config['tools']),
-        False
+        False,
+        service_config.get('icon', 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/wechat/wechat-original.svg')
     ))
     
     conn.commit()
@@ -175,20 +240,169 @@ def register_mcp_provider(conn, tenant_id, user_id, service_config):
     return provider_id
 
 
-def verify_mcp_connection(conn, provider_id):
-    """验证 MCP 连接是否可用"""
+def register_api_provider(conn, tenant_id, user_id, service_config):
+    """注册 API Tool Provider"""
     cur = conn.cursor()
+    
+    identifier = service_config['identifier']
+    name = service_config['name']
+    schema_url = service_config['url']
+    
+    # 获取 OpenAPI schema
+    try:
+        import urllib.request
+        req = urllib.request.Request(schema_url, method='GET')
+        req.add_header('User-Agent', 'Dify-Enterprise-Register/1.0')
+        response = urllib.request.urlopen(req, timeout=10)
+        schema_content = response.read().decode('utf-8')
+        logger.info(f"Fetched OpenAPI schema from {schema_url} ({len(schema_content)} bytes)")
+    except Exception as e:
+        logger.error(f"Failed to fetch OpenAPI schema from {schema_url}: {e}")
+        return None
+    
+    # 检查是否已存在
     cur.execute(
-        "SELECT server_url FROM tool_mcp_providers WHERE id = %s",
-        (provider_id,)
+        "SELECT id FROM tool_api_providers WHERE name = %s AND tenant_id = %s",
+        (identifier, tenant_id)
     )
-    row = cur.fetchone()
-    cur.close()
+    existing = cur.fetchone()
     
-    if not row:
-        return False
+    # 构建 tools_str，必须符合 Dify 的 ApiToolBundle 格式
+    tools_str = json.dumps([
+        {
+            'server_url': service_config['url'].replace('/openapi.json', ''),
+            'method': 'post',
+            'summary': '文本摘要生成',
+            'operation_id': 'summarize',
+            'author': 'enterprise',
+            'parameters': [
+                {
+                    'name': 'text',
+                    'label': {'en_US': 'Text', 'zh_Hans': '文本'},
+                    'type': 'string',
+                    'form': 'llm',
+                    'llm_description': '需要摘要的文本内容',
+                    'required': True,
+                    'placeholder': {'en_US': 'Enter text to summarize', 'zh_Hans': '输入需要摘要的文本'}
+                },
+                {
+                    'name': 'max_length',
+                    'label': {'en_US': 'Max Length', 'zh_Hans': '最大长度'},
+                    'type': 'number',
+                    'form': 'llm',
+                    'llm_description': '摘要的最大长度',
+                    'required': False,
+                    'default': 100
+                }
+            ],
+            'openapi': {
+                'operationId': 'summarize',
+                'summary': '文本摘要生成',
+                'requestBody': {
+                    'content': {
+                        'application/json': {
+                            'schema': {
+                                'type': 'object',
+                                'properties': {
+                                    'text': {'type': 'string', 'description': '需要摘要的文本'},
+                                    'max_length': {'type': 'integer', 'description': '最大长度'}
+                                },
+                                'required': ['text']
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            'server_url': service_config['url'].replace('/openapi.json', ''),
+            'method': 'post',
+            'summary': '关键词提取',
+            'operation_id': 'extract_keywords',
+            'author': 'enterprise',
+            'parameters': [
+                {
+                    'name': 'text',
+                    'label': {'en_US': 'Text', 'zh_Hans': '文本'},
+                    'type': 'string',
+                    'form': 'llm',
+                    'llm_description': '需要提取关键词的文本内容',
+                    'required': True,
+                    'placeholder': {'en_US': 'Enter text to extract keywords', 'zh_Hans': '输入需要提取关键词的文本'}
+                },
+                {
+                    'name': 'count',
+                    'label': {'en_US': 'Count', 'zh_Hans': '数量'},
+                    'type': 'number',
+                    'form': 'llm',
+                    'llm_description': '提取的关键词数量',
+                    'required': False,
+                    'default': 5
+                }
+            ],
+            'openapi': {
+                'operationId': 'extract_keywords',
+                'summary': '关键词提取',
+                'requestBody': {
+                    'content': {
+                        'application/json': {
+                            'schema': {
+                                'type': 'object',
+                                'properties': {
+                                    'text': {'type': 'string', 'description': '需要提取关键词的文本'},
+                                    'count': {'type': 'integer', 'description': '关键词数量'}
+                                },
+                                'required': ['text']
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ])
     
-    server_url = row[0]
+    # 加密凭证（空凭证）
+    credentials = json.dumps({"auth_type": "none"})
+    
+    if existing:
+        logger.info(f"API provider '{identifier}' already exists (id: {existing[0]})")
+        # 更新 schema
+        cur.execute(
+            "UPDATE tool_api_providers SET schema = %s, tools_str = %s, updated_at = NOW() WHERE id = %s",
+            (schema_content, tools_str, existing[0])
+        )
+        conn.commit()
+        logger.info(f"Updated API provider '{identifier}'")
+        return existing[0]
+    
+    # 创建新的 provider
+    provider_id = str(uuid4())
+    cur.execute('''
+        INSERT INTO tool_api_providers 
+        (id, name, icon, schema, schema_type_str, user_id, tenant_id, description, tools_str, credentials_str, privacy_policy, custom_disclaimer)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ''', (
+        provider_id,
+        identifier,
+        service_config.get('icon', ''),
+        schema_content,
+        service_config.get('schema_type', 'openapi'),
+        user_id,
+        tenant_id,
+        service_config.get('description', ''),
+        tools_str,
+        credentials,
+        '',
+        ''
+    ))
+    
+    conn.commit()
+    logger.info(f"Created API provider '{identifier}' (id: {provider_id})")
+    return provider_id
+
+
+def verify_mcp_connection(server_url):
+    """验证 MCP 连接是否可用"""
     
     # 简单的 HTTP 健康检查
     try:
@@ -219,15 +433,22 @@ def register_all_services():
     conn = get_db_connection()
     
     try:
-        tenant_id, user_id = get_default_tenant_and_user(conn)
+        tenant_id, user_id, encrypt_public_key = get_default_tenant_and_user(conn)
         logger.info(f"Using tenant: {tenant_id}, user: {user_id}")
+        
+        if encrypt_public_key:
+            logger.info(f"Found encrypt_public_key for tenant (length: {len(encrypt_public_key)})")
+        else:
+            logger.warning("No encrypt_public_key found for tenant")
         
         for service_id, service_config in ENTERPRISE_SERVICES.items():
             logger.info(f"Registering service: {service_id}")
             
             if service_config['type'] == 'mcp':
-                provider_id = register_mcp_provider(conn, tenant_id, user_id, service_config)
-                verify_mcp_connection(conn, provider_id)
+                provider_id = register_mcp_provider(conn, tenant_id, user_id, encrypt_public_key, service_config)
+                verify_mcp_connection(service_config['url'])
+            elif service_config['type'] == 'api':
+                provider_id = register_api_provider(conn, tenant_id, user_id, service_config)
             else:
                 logger.warning(f"Unknown service type: {service_config['type']}")
         

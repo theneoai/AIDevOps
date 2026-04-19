@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const config_1 = require("./config");
 const logger_1 = require("./logger");
 const health_1 = __importDefault(require("./routes/health"));
+const tools_1 = __importDefault(require("./routes/tools"));
 const logger = (0, logger_1.createLogger)();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -18,6 +19,7 @@ app.get('/', (_req, res) => {
     });
 });
 app.use('/', health_1.default);
+app.use('/', tools_1.default);
 app.use((err, _req, res, _next) => {
     logger.error('Unhandled error', { error: err.message, stack: err.stack });
     res.status(500).json({ error: 'Internal Server Error' });

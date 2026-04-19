@@ -1,4 +1,4 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-status
 
 # ─── 初始化 ───
 init:
@@ -45,6 +45,25 @@ register-tools:
 	@docker exec docker-api-1 python3 /tmp/register-tools.py
 	@echo "✓ 工具注册完成"
 
+# ─── DevKit CLI ───
+devkit-build:
+	@echo "=== 构建 DevKit ==="
+	@cd enterprise/dev-kit && npm run build
+	@echo "✓ DevKit 构建完成"
+
+devkit-test:
+	@echo "=== 运行 DevKit 测试 ==="
+	@cd enterprise/dev-kit && npm test
+	@echo "✓ DevKit 测试完成"
+
+devkit-deploy:
+	@echo "=== 使用 DevKit 部署组件 ==="
+	@cd enterprise/dev-kit && npm run dev -- deploy $(name)
+
+devkit-status:
+	@echo "=== DevKit 组件状态 ==="
+	@cd enterprise/dev-kit && npm run dev -- status
+
 # ─── Dify 官方服务 ───
 dify-up:
 	@echo "=== 启动 Dify 官方服务 ==="
@@ -81,6 +100,11 @@ up-all: dify-up up
 	@echo "企业自研工具已自动注册到 Dify，无需手动配置"
 	@echo "刷新 Dify UI 即可在 Tools 中看到："
 	@echo "  - 微信公众号发布 (MCP)"
+	@echo "  - 企业通用工具服务 (API)"
+	@echo ""
+	@echo "DevKit 命令:"
+	@echo "  make devkit-status    查看组件状态"
+	@echo "  make devkit-deploy name=xxx  部署组件"
 
 down-all: down dify-down
 	@echo "=== 全部服务已停止 ==="

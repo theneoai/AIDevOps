@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Tool
+metadata:
+  name: wechat-publisher
+  description: "微信公众号文章发布工具"
+  icon: "📰"
+  version: "1.0.0"
+  author: "enterprise"
+  labels:
+    - "mcp"
+    - "wechat"
+    - "enterprise"
+spec:
+  type: mcp
+  server: http://mcp-wechat:3000/sse/publisher
+  tools:
+    - name: publish_article
+      description: "发布一篇微信公众号图文文章"
+      inputs:
+        - name: title
+          type: string
+          required: true
+          description: "文章标题"
+        - name: content
+          type: string
+          required: true
+          description: "文章内容（支持 HTML 格式）"
+        - name: author
+          type: string
+          required: false
+          description: "作者名"
+        - name: digest
+          type: string
+          required: false
+          description: "文章摘要"
+      outputs:
+        - name: article_id
+          type: string
+          description: "文章 ID"
+        - name: status
+          type: string
+          description: "发布状态"
+    - name: upload_image
+      description: "上传图片到微信素材库"
+      inputs:
+        - name: image_url
+          type: string
+          required: true
+          description: "图片 URL 地址"
+        - name: image_type
+          type: string
+          required: false
+          default: "content"
+          description: "图片类型"
+          enum: ["thumb", "content"]
+      outputs:
+        - name: media_id
+          type: string
+          description: "素材 media_id"

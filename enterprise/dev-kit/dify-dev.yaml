@@ -1,0 +1,14 @@
+# Dify DevKit Configuration
+# Place this file in your project root or enterprise/dev-kit/
+
+dify:
+  apiUrl: "http://api:5001"
+  consoleUrl: "http://console"
+  db:
+    host: "${DIFY_DB_HOST:-db_postgres}"
+    port: ${DIFY_DB_PORT:-5432}
+    user: "${DIFY_DB_USER:-postgres}"
+    password: "${DIFY_DB_PASSWORD:-difyai123456}"
+    database: "${DIFY_DB_NAME:-dify}"
+
+componentsDir: "./components"

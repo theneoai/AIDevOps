@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { config } from './config';
 import { createLogger } from './logger';
 import healthRouter from './routes/health';
+import toolsRouter from './routes/tools';
 
 const logger = createLogger();
 const app = express();
@@ -17,6 +18,7 @@ app.get('/', (_req, res) => {
 });
 
 app.use('/', healthRouter);
+app.use('/', toolsRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error('Unhandled error', { error: err.message, stack: err.stack });
