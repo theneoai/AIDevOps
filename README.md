@@ -1,202 +1,395 @@
-# 企业 Agent 应用框架
+# AIDevOps — Enterprise Agent Framework
 
-基于开源社区版 Dify 的企业级 Agent 应用框架，支持 Workflow、Tool、MCP、Skill 等基础设施的自主开发和维护。
+> **Language / 语言:** English | [中文](README.zh-CN.md)
 
-## 架构设计
+Enterprise-grade Agent application framework built on top of open-source [Dify](https://github.com/langgenius/dify), with zero-intrusion architecture — all enterprise logic lives in a separate layer; Dify is included as a git submodule and never modified.
 
-参见：[架构设计文档](docs/superpowers/specs/2026-04-19-enterprise-agent-framework-design.md)
+---
 
-## 快速开始
+## Table of Contents
 
-### 1. 环境准备
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Development Guide](#development-guide)
+- [Commands Reference](#commands-reference)
+- [Dify Integration](#dify-integration)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Configuration Reference](#configuration-reference)
+- [License](#license)
+
+---
+
+## Overview
+
+AIDevOps provides a **Code-Driven Development (CDD)** workflow for Dify-based AI applications. Teams declare components (Tools, MCP Servers, Workflows, Skills) as YAML DSL, implement business logic in TypeScript, and let the DevKit CLI handle registration, validation, and deployment to Dify.
+
+**Core Principle: Zero-intrusion into Dify source code.**
+
+Dify is included as a `git submodule` and is never modified. Enterprise capabilities are developed in the `/enterprise` layer and integrated with Dify through its public API adapter.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Enterprise Layer                   │
+│                                                     │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────┐  │
+│  │  DevKit CLI │  │ Tool Service │  │MCP Servers│  │
+│  │  (YAML DSL) │  │  (REST API)  │  │ (SSE/MCP) │  │
+│  └──────┬──────┘  └──────┬───────┘  └─────┬─────┘  │
+│         │                │                │         │
+│  ┌──────▼────────────────▼────────────────▼──────┐  │
+│  │           Dify API Adapter (API-first)         │  │
+│  └──────────────────────┬──────────────────────┬─┘  │
+└─────────────────────────│──────────────────────│───┘
+                          │                      │
+┌─────────────────────────▼──────────────────────▼───┐
+│                    Dify (submodule)                  │
+│         Console · API Server · Worker · DB           │
+└─────────────────────────────────────────────────────┘
+```
+
+**Key design decisions:**
+- **Dify as submodule** — upgrade by bumping `DIFY_VERSION`, no merge conflicts
+- **API-first adapter** — all Dify interactions through REST API, no direct DB writes in production
+- **Declarative YAML DSL** — components defined as code, versioned in Git
+- **Hybrid encryption** — full RSA+AES encryption compatible with Dify's internal scheme
+
+---
+
+## Features
+
+| Category | Feature |
+|---|---|
+| **CDD** | YAML DSL for Tools, MCP Servers, Workflows, Skills |
+| **DevKit CLI** | `create`, `deploy`, `validate`, `registry`, `status`, `watch` commands |
+| **MCP Servers** | WeChat (微信), Feishu (飞书), DingTalk (钉钉), Custom IM |
+| **Security** | JWT RBAC (4 tiers), PII detection (Presidio), prompt injection guard |
+| **Encryption** | RSA+AES hybrid encryption, Dify-compatible |
+| **Observability** | Langfuse tracing, OpenTelemetry, Prometheus metrics |
+| **Kubernetes** | Helm charts, HPA, NetworkPolicy, ArgoCD GitOps |
+| **CI/CD** | 7-stage GitHub Actions pipeline with HITL production gate |
+
+---
+
+## Quick Start
+
+### Prerequisites
 
 - Docker & Docker Compose
-- Node.js 18+（开发时）
-- Make（可选，用于简化命令）
+- Node.js 18+ (for development)
+- Make (optional, simplifies commands)
 
-### 2. 初始化
-
-```bash
-make init
-# 或
-./enterprise/scripts/init.sh
-```
-
-### 3. 配置环境变量
+### 1. Clone with submodules
 
 ```bash
-# 编辑 .env 文件，填写必要的配置
-cp .env.example .env
-vim .env
-```
+git clone --recursive https://github.com/theneoai/aidevops.git
+cd aidevops
 
-### 4. 构建并启动
-
-```bash
-make build
-make up
-```
-
-### 5. 验证服务状态
-
-```bash
-make health
-# 或
-./enterprise/scripts/health-check.sh
-```
-
-## 项目结构
-
-```
-.
-├── docker-compose.yml          # 统一编排文件
-├── Makefile                    # 常用命令
-├── .env                        # 环境变量
-│
-├── enterprise/                 # 企业自研基础设施层
-│   ├── tool-service/           # 通用 Tool 服务
-│   ├── mcp-servers/            # MCP Server 集群
-│   │   ├── mcp-wechat/         # 微信公众号 MCP
-│   │   └── mcp-template/       # MCP 脚手架模板
-│   ├── workflows/              # Workflow 模板库
-│   ├── skills/                 # Skill 配置文件库
-│   └── scripts/                # 运维脚本
-│
-└── docs/                       # 文档
-```
-
-## 开发指南
-
-### 新增 MCP Server
-
-```bash
-cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-your-service
-# 修改 package.json、实现工具逻辑、添加 docker-compose 配置
-```
-
-### 新增 Tool
-
-在 `enterprise/tool-service/src/routes/` 下添加新的路由文件。
-
-### 新增 Workflow 模板
-
-在 Dify Studio 中设计 Workflow，导出到 `enterprise/workflows/对应业务域/` 目录。
-
-### 新增 Skill
-
-参考 `enterprise/skills/marketing/wechat-publisher.yml` 创建新的 Skill 配置文件。
-
-## 常用命令
-
-| 命令 | 说明 |
-|------|------|
-| `make init` | 初始化项目 |
-| `make build` | 构建企业自研服务 |
-| `make up` | 启动企业自研服务 |
-| `make down` | 停止企业自研服务 |
-| `make dify-up` | 启动 Dify 官方服务 |
-| `make dify-down` | 停止 Dify 官方服务 |
-| `make up-all` | 启动全部服务（Dify + 企业自研） |
-| `make down-all` | 停止全部服务 |
-| `make logs` | 查看企业自研服务日志 |
-| `make status` | 查看企业自研服务状态 |
-| `make health` | 健康检查 |
-| `make restart` | 重启企业自研服务 |
-| `make clean` | 清理容器和镜像 |
-
-## 与 Dify 集成
-
-Dify 作为 Git 子模块引入，位于 `dify/` 目录。
-
-### 首次克隆
-
-```bash
-# 克隆主仓库（包含子模块）
-git clone --recursive <your-repo-url>
-
-# 如果已克隆但未初始化子模块
+# If already cloned without submodules:
 git submodule update --init --recursive
 ```
 
-### 启动全部服务
+### 2. Initialize
 
 ```bash
-# 启动 Dify + 企业自研服务
-make up-all
+make init
+# or
+./enterprise/scripts/init.sh
+```
 
-# 仅启动企业自研服务
+### 3. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env — at minimum set DIFY_BASE_URL and DIFY_API_KEY
+vim .env
+```
+
+### 4. Build and start
+
+```bash
+# Enterprise services only (no Dify)
 make up
 
-# 仅启动 Dify
-make dify-up
+# Enterprise + Dify (full stack)
+make up-all
 ```
 
-### 停止服务
+### 5. Verify health
 
 ```bash
-# 停止全部服务
-make down-all
-
-# 仅停止企业自研服务
-make down
-
-# 仅停止 Dify
-make dify-down
+make health
 ```
 
-### Dify 中配置企业自研服务
+### 6. Build DevKit CLI
 
-#### 方式一：开发 Dify 插件（推荐，功能完整）
+```bash
+make devkit-build
 
-Dify 1.0+ 版本使用插件系统扩展功能。企业自研服务需要开发为 Dify 插件：
+# Validate all components
+make devkit-validate
+```
 
-1. **安装 Dify 插件 CLI**
-   ```bash
-   brew tap langgenius/dify
-   brew install dify
-   ```
+---
 
-2. **创建 Tool 插件**
-   ```bash
-   cd enterprise/plugins
-   dify plugin init
-   # 选择 Tool 类型，配置 API 端点指向 enterprise-tool-service
-   ```
+## Project Structure
 
-3. **创建 MCP 插件**
-   ```bash
-   dify plugin init
-   # 选择 Tool 类型，配置 MCP Server 端点指向 mcp-wechat
-   ```
+```
+.
+├── DIFY_VERSION                    # Pinned Dify submodule SHA
+├── Makefile                        # Unified command shortcuts (100+ targets)
+├── .env.example                    # Environment variable template
+├── docker-compose.yml              # Enterprise services orchestration
+├── docker-compose.dev.yml          # Development overrides
+├── docker-compose.observability.yml# Prometheus + Grafana + Langfuse
+├── docker-compose.security.yml     # Presidio PII detection stack
+├── docker-compose.swarm.yml        # Docker Swarm deployment
+│
+├── enterprise/                     # Enterprise self-developed layer
+│   ├── dev-kit/                    # DevKit CLI (TypeScript)
+│   │   ├── src/
+│   │   │   ├── cli.ts              # CLI entry point
+│   │   │   ├── commands/           # CLI commands (7)
+│   │   │   ├── compilers/          # DSL → Dify JSON compilers
+│   │   │   ├── adapters/           # IDifyAdapter implementations
+│   │   │   ├── core/               # Parser, config, orchestrator, HITL
+│   │   │   ├── types/              # DSL + Dify TypeScript types
+│   │   │   └── audit/              # Audit logging service
+│   │   └── tests/                  # Unit + contract tests
+│   │
+│   ├── tool-service/               # Generic REST API Tool service
+│   │   └── src/
+│   │       ├── middleware/         # RBAC + prompt-guard
+│   │       ├── routes/             # health + tools endpoints
+│   │       └── pii/                # Presidio PII client
+│   │
+│   ├── mcp-servers/                # MCP Server implementations
+│   │   ├── mcp-wechat/             # WeChat Official Account
+│   │   ├── mcp-feishu/             # Feishu / Lark
+│   │   ├── mcp-dingtalk/           # DingTalk
+│   │   ├── mcp-custom-im/          # Generic IM (webhook / config)
+│   │   └── mcp-template/           # Scaffold for new MCP servers
+│   │
+│   ├── components/                 # Component YAML definitions + templates
+│   ├── workflows/                  # Workflow template library
+│   ├── skills/                     # Skill configuration library
+│   └── scripts/                    # Init, health-check, tool registration
+│
+├── dify/                           # Dify (git submodule — do not modify)
+├── docs/                           # Project documentation
+├── helm/                           # Kubernetes Helm charts
+├── argocd/                         # ArgoCD GitOps ApplicationSet
+├── prometheus/                     # Prometheus + Alertmanager config
+├── registry/                       # Component registry index
+└── vscode-dify-dev/                # VSCode extension (validate + deploy)
+```
 
-4. **打包并安装到 Dify**
-   ```bash
-   dify plugin package ./your-plugin
-   # 在 Dify → Plugins → Install 中上传安装
-   ```
+---
 
-#### 方式二：配置外部 API 工具（简单，功能受限）
+## Development Guide
 
-1. **配置 HTTP Tool**
-   - 进入 Dify → Tools → Custom
-   - 添加 HTTP API
-   - URL: `http://enterprise-tool-service:3000/...`
+### Adding a New MCP Server
 
-2. **配置 MCP Server**
-   - 进入 Dify → Tools → MCP
-   - 添加 MCP Server (HTTP)
-   - Server URL: `http://mcp-wechat:3000/sse`
-   - Name: `微信公众号发布`
+```bash
+# 1. Copy the scaffold template
+cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-yourservice
 
-### 服务访问地址
+# 2. Implement tools in src/index.ts
+# 3. Add credentials via readSecret() in src/config.ts
+# 4. Ensure /health and /metrics endpoints are present
+# 5. Add service to docker-compose.yml
+# 6. Register a component spec in registry/index.json
+```
 
-| 服务 | 地址 |
-|------|------|
-| Dify 控制台 | http://localhost/install |
+### Adding a New Tool (REST)
+
+Add a route file under `enterprise/tool-service/src/routes/` following the pattern in `tools.ts`.
+
+### Adding a New CLI Command
+
+```bash
+# 1. Create enterprise/dev-kit/src/commands/<name>.ts
+# 2. Export async function <name>Command(...)
+# 3. Register in enterprise/dev-kit/src/cli.ts
+# 4. Add tests in enterprise/dev-kit/tests/
+```
+
+### Component DSL
+
+Define components as YAML. See [DevKit README](enterprise/dev-kit/README.md) for full DSL reference.
+
+```yaml
+apiVersion: v1
+kind: Tool
+metadata:
+  name: weather-api
+  version: "1.0.0"
+  labels: [api, weather]
+spec:
+  type: api
+  server: http://tool-service:3100
+  authentication:
+    type: api_key
+    keyName: X-API-Key
+    keyLocation: header
+  endpoints:
+    - path: /v1/weather
+      method: GET
+      operationId: getWeather
+      inputs:
+        - name: city
+          type: string
+          required: true
+```
+
+### Running Tests
+
+```bash
+# DevKit unit tests
+make devkit-test
+
+# With local Ollama (avoids LLM API costs)
+USE_LOCAL_LLM=true make devkit-test
+
+# Type checking
+cd enterprise/dev-kit && npm run typecheck
+```
+
+### VSCode Extension
+
+Install from `vscode-dify-dev/`. Provides:
+- YAML syntax highlighting for `dify-dsl` files
+- Schema validation on save
+- `Cmd+Shift+D` — deploy component to Dify
+- Command palette: `Dify: Validate`, `Dify: Watch`
+
+---
+
+## Commands Reference
+
+| Command | Description |
+|---|---|
+| `make init` | Initialize project (secrets, submodules) |
+| `make build` | Build enterprise services |
+| `make up` | Start enterprise services |
+| `make down` | Stop enterprise services |
+| `make dify-up` | Start Dify services |
+| `make dify-down` | Stop Dify services |
+| `make up-all` | Start all services (Dify + enterprise) |
+| `make down-all` | Stop all services |
+| `make logs` | Tail enterprise service logs |
+| `make status` | Show service container status |
+| `make health` | Run health checks |
+| `make restart` | Restart enterprise services |
+| `make clean` | Remove containers and images |
+| `make devkit-build` | Build DevKit CLI |
+| `make devkit-test` | Run DevKit unit tests |
+| `make devkit-validate` | Validate all components |
+| `make observability-up` | Start monitoring stack |
+| `make security-up` | Start PII detection stack |
+
+---
+
+## Dify Integration
+
+### Connecting Enterprise Services to Dify
+
+**Option 1: Dify Plugin (Recommended — full feature set)**
+
+Dify 1.0+ uses a plugin system. Build enterprise services as plugins:
+
+```bash
+# Install Dify Plugin CLI
+brew tap langgenius/dify && brew install dify
+
+# Create a Tool plugin pointing to tool-service
+cd enterprise/plugins
+dify plugin init   # Select: Tool type
+
+# Package and install
+dify plugin package ./your-plugin
+# Upload via: Dify → Plugins → Install
+```
+
+**Option 2: External API Tool (Simple)**
+
+1. Dify → Tools → Custom → Add HTTP API
+2. URL: `http://enterprise-tool-service:3100/...`
+3. For MCP: Dify → Tools → MCP → Add MCP Server (HTTP/SSE)
+   - Server URL: `http://mcp-wechat:3001/sse`
+
+### Service Endpoints
+
+| Service | Address |
+|---|---|
+| Dify Console | http://localhost/install |
 | Dify API | http://localhost:5001 |
-| 企业 Tool Service | http://localhost:3100 |
-| 微信 MCP | http://localhost:3001/sse |
+| Enterprise Tool Service | http://localhost:3100 |
+| WeChat MCP | http://localhost:3001/sse |
+| Feishu MCP | http://localhost:3003/sse |
+| DingTalk MCP | http://localhost:3005/sse |
+| Custom IM MCP | http://localhost:3004/sse |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
 
-## 许可证
+### Dify Version Management
 
-MIT
+```bash
+# Check pinned version
+cat DIFY_VERSION
+
+# Upgrade Dify submodule
+cd dify && git fetch origin && git checkout <new-sha>
+cd .. && echo "<new-sha>" > DIFY_VERSION
+
+# Trigger compatibility check in CI
+git commit -m "chore: upgrade dify submodule [dify-upgrade]"
+```
+
+The CI pipeline detects `[dify-upgrade]` in commit messages and automatically runs contract tests.
+
+---
+
+## CI/CD Pipeline
+
+The pipeline runs 7 stages. See [GitHub Actions documentation](docs/github-actions.md) for full details.
+
+```
+validate → dify-compat → test-unit ─┐
+                                     ├─→ build → deploy-staging → integration-tests → deploy-production
+                        security  ──┘
+```
+
+**Manual triggers** support `deploy_env` (staging/production) and `skip_tests` (emergency deploys).
+
+---
+
+## Configuration Reference
+
+Copy `.env.example` to `.env` and set the required values.
+
+| Variable | Required | Description |
+|---|---|---|
+| `DIFY_BASE_URL` | Yes | Dify API base URL |
+| `DIFY_API_KEY` | Yes | Dify console API key |
+| `JWT_SECRET` | Yes | JWT signing secret (RBAC) |
+| `STANDALONE_MODE` | No | `true` to disable Dify registration |
+| `LANGFUSE_PUBLIC_KEY` | No | Langfuse observability |
+| `PRESIDIO_ANALYZER_URL` | No | PII detection endpoint |
+| `WECHAT_APP_ID` | No | WeChat Official Account App ID |
+| `FEISHU_APP_ID` | No | Feishu App ID |
+| `DINGTALK_APP_KEY` | No | DingTalk App Key |
+
+See `.env.example` for the complete list with descriptions.
+
+---
+
+## License
+
+[MIT](LICENSE)
