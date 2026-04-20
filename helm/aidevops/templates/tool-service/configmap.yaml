@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tool-service-config
+data:
+  LOG_LEVEL: {{ .Values.toolService.env.LOG_LEVEL | quote }}
+  NODE_ENV: {{ .Values.toolService.env.NODE_ENV | quote }}
+  OTEL_ENABLED: {{ .Values.toolService.env.OTEL_ENABLED | quote }}
+  SERVICE_PORT: {{ .Values.toolService.port | quote }}

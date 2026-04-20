@@ -1,0 +1,44 @@
+apiVersion: dify.enterprise/v1
+kind: Agent
+metadata:
+  name: customer-service-agent
+  description: 智能客服 Agent，处理常见问题、工单创建和升级路由
+  author: enterprise
+  tags: [customer-service, support, template]
+
+spec:
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.3
+    maxTokens: 1024
+
+  role: worker
+
+  systemPrompt: |
+    你是一名专业的客服助手。你的职责是：
+    1. 礼貌、准确地回答用户问题
+    2. 当问题超出你的能力范围时，创建工单并升级给人工客服
+    3. 绝不捏造信息，如不确定请明确说明
+
+  tools:
+    - ref: enterprise-tool-service.summarize
+    - ref: enterprise-tool-service.extract-keywords
+
+  inputs:
+    - name: user_message
+      type: string
+      description: 用户的问题或请求
+      required: true
+    - name: session_id
+      type: string
+      description: 会话 ID，用于上下文追踪
+      required: false
+
+  outputs:
+    - name: response
+      type: string
+      description: 客服回复内容
+    - name: escalated
+      type: boolean
+      description: 是否已升级至人工客服

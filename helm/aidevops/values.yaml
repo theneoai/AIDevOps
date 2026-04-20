@@ -1,0 +1,50 @@
+image:
+  registry: ghcr.io/theneoai/aidevops
+  tag: latest
+  pullPolicy: IfNotPresent
+
+toolService:
+  replicas: 2
+  port: 3000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  env:
+    LOG_LEVEL: info
+    NODE_ENV: production
+    OTEL_ENABLED: "true"
+
+mcpWechat:
+  replicas: 1
+  port: 3000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  env:
+    LOG_LEVEL: info
+    NODE_ENV: production
+    OTEL_ENABLED: "true"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: aidevops.example.com
+  tls: false
+
+networkPolicy:
+  enabled: true
+
+hpa:
+  enabled: true
+  toolService:
+    minReplicas: 2
+    maxReplicas: 10
+    cpuUtilization: 70

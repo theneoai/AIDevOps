@@ -12,16 +12,19 @@ import { deployCommand } from './commands/deploy';
 import { statusCommand } from './commands/status';
 import { validateCommand } from './commands/validate';
 import { testRunCommand } from './commands/test-run';
+import { watchCommand } from './commands/watch';
+import { syncPromptsCommand } from './commands/sync-prompts';
 
 const program = new Command();
 
 program
   .name('dify-dev')
   .description('Dify DevKit - CLI tool for creating Dify components via code')
-  .version('0.2.0')
+  .version('0.3.0')
   .option('-c, --config <path>', 'Path to configuration file')
   .option('-v, --verbose', 'Enable verbose output', false)
-  .option('--dry-run', 'Show what would be done without making changes', false);
+  .option('--dry-run', 'Show what would be done without making changes', false)
+  .option('--tenant <name>', 'Target tenant name (multi-tenancy)');
 
 // ─────────────────────────────────────────────────────────────
 // Create Command
@@ -121,6 +124,38 @@ program
       mockFile: options.mockFile,
       output: options.output,
       maxRounds: options.maxRounds ? parseInt(options.maxRounds, 10) : undefined,
+    });
+  });
+
+// ─────────────────────────────────────────────────────────────
+// Watch Command (P4-2: hot reload)
+// ─────────────────────────────────────────────────────────────
+
+program
+  .command('watch')
+  .description('Watch component files and hot-deploy on change')
+  .option('-p, --pattern <glob>', 'File glob pattern to watch', 'enterprise/components/**/*.yml')
+  .option('-d, --debounce <ms>', 'Debounce delay in ms', '500')
+  .action(async (options: { pattern: string; debounce: string }) => {
+    await watchCommand({
+      pattern: options.pattern,
+      debounce: parseInt(options.debounce, 10),
+      verbose: program.opts().verbose,
+    });
+  });
+
+// ─────────────────────────────────────────────────────────────
+// Sync Prompts Command (P4-3: Langfuse integration)
+// ─────────────────────────────────────────────────────────────
+
+program
+  .command('sync-prompts')
+  .description('Pull latest prompt versions from Langfuse into component DSL')
+  .argument('<component>', 'Path to component YAML file')
+  .action(async (componentPath: string) => {
+    await syncPromptsCommand(componentPath, {
+      dryRun: program.opts().dryRun,
+      verbose: program.opts().verbose,
     });
   });
 

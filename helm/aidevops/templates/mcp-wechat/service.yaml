@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-wechat
+  labels:
+    app: mcp-wechat
+spec:
+  selector:
+    app: mcp-wechat
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.mcpWechat.port }}
+  # SessionAffinity required for SSE until StreamableHTTP migration (P3-4)
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  type: ClusterIP

@@ -1,0 +1,19 @@
+{{- if .Values.networkPolicy.enabled }}
+# Tenant namespace isolation — allows only same-namespace + system-namespace ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-isolation
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: aidevops-system
+  policyTypes:
+    - Ingress
+{{- end }}

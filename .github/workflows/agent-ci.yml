@@ -178,11 +178,21 @@ jobs:
         working-directory: enterprise/dev-kit
         run: npm ci
 
-      - name: Run unit tests
+      - name: Start Ollama for local LLM testing
+        run: |
+          docker run -d --name ollama -p 11434:11434 ollama/ollama:latest
+          sleep 15
+          docker exec ollama ollama pull llama3.2:3b --quiet || true
+          echo "Ollama ready"
+
+      - name: Run unit tests (with local LLM)
         working-directory: enterprise/dev-kit
         run: npm test -- --coverage --coverageReporters=json-summary --coverageReporters=lcov
         env:
           NODE_ENV: test
+          USE_LOCAL_LLM: "true"
+          OLLAMA_BASE_URL: "http://localhost:11434"
+          OLLAMA_MODEL: "llama3.2:3b"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -429,14 +439,11 @@ jobs:
         working-directory: enterprise/dev-kit
         run: npm ci && npm run build
 
-      - name: Deploy components to staging Dify
+      - name: Deploy components to staging Dify (API adapter)
         working-directory: enterprise/dev-kit
         env:
-          DIFY_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
-          DIFY_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
-          DIFY_DB_PORT: '5432'
-          DIFY_DB_NAME: dify
-          DIFY_DB_USER: postgres
+          DIFY_BASE_URL: ${{ secrets.STAGING_DIFY_BASE_URL }}
+          DIFY_API_KEY: ${{ secrets.STAGING_DIFY_API_KEY }}
         run: |
           node dist/cli.js validate --all --level 3
           if [ -d "../../enterprise/components" ]; then
@@ -446,6 +453,15 @@ jobs:
               node dist/cli.js deploy "$name" --verbose
             done
           fi
+
+      - name: Trigger ArgoCD sync (Staging)
+        if: success()
+        run: |
+          argocd app sync aidevops-staging \
+            --auth-token "${{ secrets.ARGOCD_TOKEN }}" \
+            --server "${{ secrets.ARGOCD_SERVER }}" \
+            --grpc-web \
+            --timeout 120 || echo "ArgoCD not configured, skipping"
 
       - name: Record deployment event
         if: always()

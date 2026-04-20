@@ -132,3 +132,62 @@ security-up:
 
 security-down:
 	@docker compose -f docker-compose.yml -f docker-compose.security.yml down presidio-analyzer presidio-anonymizer guardrails
+
+# ─── P3: Docker Swarm ───
+swarm-init:
+	@echo "=== 初始化 Docker Swarm ==="
+	@docker swarm init 2>/dev/null || echo "Already in swarm mode"
+	@docker stack deploy -c docker-compose.yml -c docker-compose.swarm.yml aidevops --with-registry-auth
+	@echo "✓ Stack deployed. Check: docker stack services aidevops"
+
+swarm-update:
+	@echo "=== 滚动更新 Swarm Stack ==="
+	@docker stack deploy -c docker-compose.yml -c docker-compose.swarm.yml aidevops --with-registry-auth
+
+swarm-status:
+	@docker stack services aidevops
+
+swarm-down:
+	@docker stack rm aidevops
+
+# ─── P3: Helm / K8s ───
+helm-lint:
+	@helm lint helm/aidevops
+
+helm-deploy-staging:
+	@helm upgrade --install aidevops helm/aidevops \
+	  -f helm/aidevops/values-staging.yaml \
+	  --namespace aidevops-staging --create-namespace \
+	  --atomic --timeout 5m
+
+helm-deploy-prod:
+	@helm upgrade --install aidevops helm/aidevops \
+	  -f helm/aidevops/values-prod.yaml \
+	  --namespace aidevops-production --create-namespace \
+	  --atomic --timeout 10m
+
+# ─── P4: 本地开发栈 ───
+dev-up:
+	@echo "=== 启动本地开发栈 (企业服务 + Ollama) ==="
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml up enterprise-tool-service mcp-wechat ollama -d
+	@echo "✓ 开发栈已启动"
+	@echo "  Ollama:       http://localhost:11434"
+	@echo "  Tool Service: http://localhost:3100"
+	@echo "  MCP WeChat:   http://localhost:3001"
+	@echo ""
+	@echo "热重载: make devkit-watch"
+
+dev-down:
+	@docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+ollama-pull:
+	@echo "=== 拉取 Ollama 模型: $${OLLAMA_MODEL:-llama3.2:3b} ==="
+	@docker exec ollama ollama pull $${OLLAMA_MODEL:-llama3.2:3b}
+
+devkit-watch:
+	@echo "=== DevKit 热重载模式 ==="
+	@cd enterprise/dev-kit && npm run dev -- watch --verbose
+
+devkit-sync-prompts:
+	@echo "=== 从 Langfuse 同步 Prompt ==="
+	@cd enterprise/dev-kit && npm run dev -- sync-prompts $(file)

@@ -1,0 +1,20 @@
+image:
+  tag: staging
+
+toolService:
+  replicas: 1
+  resources:
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+mcpWechat:
+  replicas: 1
+
+ingress:
+  host: staging.aidevops.example.com
+
+hpa:
+  toolService:
+    minReplicas: 1
+    maxReplicas: 3
