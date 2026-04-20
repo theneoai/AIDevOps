@@ -72,11 +72,15 @@ dify-up:
 		echo "请先运行: git submodule update --init --recursive"; \
 		exit 1; \
 	fi
-	@cd dify/docker && docker-compose up -d
+	@if [ ! -f "dify/docker/middleware.env" ]; then \
+		cp dify/docker/middleware.env.example dify/docker/middleware.env; \
+		echo "已创建 middleware.env"; \
+	fi
+	@cd dify/docker && docker-compose -f docker-compose.yaml -f docker-compose.middleware.yaml up -d
 	@echo "=== 连接企业服务到 Dify 网络 ==="
 	@sleep 5
-	@docker network connect docker_default mcp-wechat 2>/dev/null || true
-	@docker network connect docker_default enterprise-tool-service 2>/dev/null || true
+	@docker network connect docker_default mcp-wechat 2>/dev/null || docker network disconnect docker_default mcp-wechat 2>/dev/null && docker network connect docker_default mcp-wechat 2>/dev/null || true
+	@docker network connect docker_default enterprise-tool-service 2>/dev/null || docker network disconnect docker_default enterprise-tool-service 2>/dev/null && docker network connect docker_default enterprise-tool-service 2>/dev/null || true
 	@echo "✓ 企业自研服务已连接到 Dify 网络"
 	@echo "=== 自动注册企业自研工具到 Dify ==="
 	@sleep 10
@@ -85,7 +89,7 @@ dify-up:
 dify-down:
 	@echo "=== 停止 Dify 官方服务 ==="
 	@if [ -d "dify/docker" ]; then \
-		cd dify/docker && docker-compose down; \
+		cd dify/docker && docker-compose -f docker-compose.yaml -f docker-compose.middleware.yaml down; \
 	fi
 
 # ─── 全部服务（Dify + 企业自研）───
