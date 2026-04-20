@@ -1,4 +1,4 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-status observability-up observability-down security-up security-down
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets
 
 # ─── 初始化 ───
 init:
@@ -7,7 +7,39 @@ init:
 	@echo "=== 初始化完成 ==="
 	@echo "下一步:"
 	@echo "  1. 编辑 .env 文件，填写必要的配置"
-	@echo "  2. 运行: make up-all"
+	@echo "  2a. 有 Dify: make up-all"
+	@echo "  2b. 无 Dify: make standalone-up"
+
+# ─── 密钥目录初始化 ───
+init-secrets:
+	@echo "=== 初始化 secrets/ 目录 ==="
+	@bash scripts/init-secrets.sh
+
+# ─── 独立模式（无需 Dify 子模块）───
+standalone-up:
+	@echo "=== 启动独立企业服务栈 (无 Dify 依赖) ==="
+	@test -f .env || cp .env.example .env
+	@docker network inspect standalone-network >/dev/null 2>&1 || docker network create standalone-network
+	@docker compose \
+	  -f docker-compose.yml \
+	  -f docker-compose.standalone.yml \
+	  up enterprise-tool-service mcp-wechat mcp-custom-im ollama devkit -d
+	@echo ""
+	@echo "=== 独立栈已启动 ==="
+	@echo "  Tool Service: http://localhost:3100/health"
+	@echo "  MCP WeChat:   http://localhost:3001/health"
+	@echo "  MCP Custom:   http://localhost:3005/health"
+	@echo "  Ollama:       http://localhost:11434"
+	@echo ""
+	@echo "DevKit 离线验证:"
+	@echo "  make devkit-status   (无需 Dify 连接)"
+	@echo "  dify-dev validate --all"
+
+standalone-down:
+	@docker compose \
+	  -f docker-compose.yml \
+	  -f docker-compose.standalone.yml \
+	  down
 
 # ─── 构建 ───
 build:
@@ -61,7 +93,11 @@ devkit-deploy:
 	@cd enterprise/dev-kit && npm run dev -- deploy $(name)
 
 devkit-status:
-	@echo "=== DevKit 组件状态 ==="
+	@echo "=== DevKit 组件状态 (本地文件) ==="
+	@cd enterprise/dev-kit && npm run dev -- status --offline
+
+devkit-status-online:
+	@echo "=== DevKit 组件状态 (Dify API) ==="
 	@cd enterprise/dev-kit && npm run dev -- status
 
 # ─── Dify 官方服务 ───

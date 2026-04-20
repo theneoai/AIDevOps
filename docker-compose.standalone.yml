@@ -1,0 +1,92 @@
+# ==================================================================
+# Standalone Enterprise Stack (无 Dify 依赖)
+# ==================================================================
+# 用于本地开发和测试：无需 Dify 子模块，无需 Dify 服务运行。
+#
+# 包含服务:
+#   - enterprise-tool-service  (port 3100)
+#   - mcp-wechat               (port 3001)
+#   - mcp-custom-im            (port 3005, 如配置)
+#   - ollama                   (port 11434, 本地 LLM)
+#
+# 启动:
+#   make standalone-up
+#   # 或直接:
+#   docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d
+#
+# 说明:
+#   - 所有 Dify 注册步骤跳过 (SKIP_DIFY_REGISTRATION=true)
+#   - DevKit 以 offline/validate-only 模式运行
+#   - 使用 Ollama 替代 OpenAI，无外部 LLM 费用
+# ==================================================================
+
+version: "3.8"
+
+services:
+  # ─── 覆盖: 企业工具服务 — 独立模式 ───
+  enterprise-tool-service:
+    environment:
+      - SKIP_DIFY_REGISTRATION=true
+      - NODE_ENV=development
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+    networks:
+      - standalone-network
+
+  # ─── 覆盖: 微信 MCP — 独立模式 ───
+  mcp-wechat:
+    environment:
+      - SKIP_DIFY_REGISTRATION=true
+      - NODE_ENV=development
+    networks:
+      - standalone-network
+
+  # ─── 覆盖: DevKit — 离线/验证模式 ───
+  devkit:
+    environment:
+      - DIFY_BASE_URL=
+      - DIFY_API_KEY=
+      - SKIP_DIFY_REGISTRATION=true
+      - USE_LOCAL_LLM=true
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - NODE_ENV=development
+    # 独立模式下只做本地验证，不尝试连接 Dify
+    command: ["status", "--offline"]
+    networks:
+      - standalone-network
+
+  # ─── 本地 LLM (Ollama) ───
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-standalone
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - standalone-network
+    restart: unless-stopped
+    # 自动拉取默认模型（首次启动较慢）
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        sleep 5
+        ollama pull ${OLLAMA_MODEL:-llama3.2:3b}
+        wait
+
+  # ─── 自定义 IM MCP — 独立模式 ───
+  mcp-custom-im:
+    networks:
+      - standalone-network
+    profiles: []  # 去掉 custom-im profile，在独立模式下默认启动
+
+# 独立网络（不与 Dify 共享）
+networks:
+  standalone-network:
+    driver: bridge
+    name: standalone-network
+
+volumes:
+  ollama_data:
+    driver: local

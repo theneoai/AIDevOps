@@ -13,7 +13,11 @@ import * as yaml from 'yaml';
 // Type-safe Config Interface
 // ─────────────────────────────────────────────────────────────
 
-export interface DifyDatabaseConfig {
+// ─────────────────────────────────────────────────────────────
+// Platform-agnostic database config (used only by the deprecated db adapter)
+// ─────────────────────────────────────────────────────────────
+
+export interface DatabaseConfig {
   host: string;
   port: number;
   user: string;
@@ -21,33 +25,46 @@ export interface DifyDatabaseConfig {
   database: string;
 }
 
-export interface DifyConfig {
-  /** Dify API base URL (used by DifyApiAdapter) */
+/** @deprecated Use DatabaseConfig */
+export type DifyDatabaseConfig = DatabaseConfig;
+
+// ─────────────────────────────────────────────────────────────
+// Backend (platform) config
+// Keyed as `dify:` in dify-dev.yaml for backward compat, but the
+// interface is platform-agnostic so backends other than Dify can be
+// introduced without touching the schema.
+// ─────────────────────────────────────────────────────────────
+
+export interface BackendConfig {
+  /** Backend REST API base URL (e.g. http://localhost/v1 for Dify) */
   apiUrl: string;
-  /** Dify Console URL */
+  /** Console/UI base URL */
   consoleUrl: string;
-  /**
-   * Dify API key for REST adapter authentication.
-   * Set via DIFY_API_KEY env var or dify.apiKey in dify-dev.yaml.
-   */
+  /** API key for Bearer-token authenticated REST adapters */
   apiKey?: string;
   /**
-   * Base URL for the Dify REST API (e.g. http://localhost/v1).
-   * Defaults to apiUrl when not set explicitly.
+   * Alias for apiUrl — some config files use baseUrl, some use apiUrl.
+   * When both are set, baseUrl takes precedence.
    */
   baseUrl?: string;
   /**
-   * Adapter implementation: 'api' (default, recommended) or 'db' (@deprecated).
-   * 'db' bypasses Dify API validation and breaks on Dify schema upgrades.
+   * Adapter implementation: 'api' (default) or 'db' (@deprecated, Dify-specific).
+   * 'db' bypasses API validation and breaks on schema upgrades.
    */
   adapter?: 'api' | 'db';
-  /** PostgreSQL connection settings (used by DifyDbAdapter only) */
-  db: DifyDatabaseConfig;
+  /** PostgreSQL connection — used by the deprecated db adapter only */
+  db: DatabaseConfig;
 }
 
+/** @deprecated Use BackendConfig */
+export type DifyConfig = BackendConfig;
+
 export interface DevKitConfig {
-  /** Dify platform settings */
-  dify: DifyConfig;
+  /**
+   * Backend platform settings.
+   * Config key is `dify:` in dify-dev.yaml for backward compatibility.
+   */
+  dify: BackendConfig;
   /** Directory containing component definitions */
   componentsDir: string;
 }

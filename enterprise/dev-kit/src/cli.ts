@@ -78,11 +78,13 @@ program
 
 program
   .command('status')
-  .description('Show status of all deployed components')
-  .action(async () => {
+  .description('Show status of deployed components (use --offline to skip Dify connection)')
+  .option('--offline', 'Show local component files without connecting to Dify', false)
+  .action(async (options: { offline: boolean }) => {
     await statusCommand({
       configPath: program.opts().config,
       verbose: program.opts().verbose,
+      offline: options.offline,
     });
   });
 
