@@ -124,6 +124,37 @@ services:
       retries: 3
       start_period: 10s
 
+  # ─── 企业自研: 自定义 IM MCP ───
+  mcp-custom-im:
+    build:
+      context: ./enterprise/mcp-servers/mcp-custom-im
+    container_name: mcp-custom-im
+    ports:
+      - "3005:3005"
+    volumes:
+      # Mount your im-config.json at runtime (not baked into image)
+      - ${IM_CONFIG_PATH:-./enterprise/mcp-servers/mcp-custom-im/im-config.json}:/app/im-config.json:ro
+    environment:
+      - PORT=3005
+      - IM_CONFIG_PATH=/app/im-config.json
+      # Fallback: single-webhook mode (used when im-config.json is absent)
+      - IM_WEBHOOK_URL=${IM_WEBHOOK_URL:-}
+      - IM_WEBHOOK_TOKEN=${IM_WEBHOOK_TOKEN:-}
+      - IM_WEBHOOK_AUTH=${IM_WEBHOOK_AUTH:-none}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    profiles:
+      - custom-im
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   # ─── 企业自研: DevKit CLI 工具 ───
   devkit:
     build:

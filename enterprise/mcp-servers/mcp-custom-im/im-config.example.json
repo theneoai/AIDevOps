@@ -1,0 +1,127 @@
+{
+  "_comment": "Copy to im-config.json and fill in your values. ${ENV_VAR} is interpolated at runtime.",
+
+  "defaultBackend": "internal-webhook",
+  "defaultChannel": "general",
+
+  "backends": [
+    {
+      "_comment": "Example 1: Simple webhook (DingTalk robot / generic HTTP endpoint)",
+      "name": "internal-webhook",
+      "type": "webhook",
+      "url": "${IM_WEBHOOK_URL}",
+      "auth": {
+        "type": "none"
+      },
+      "messageFormat": "markdown",
+      "bodyTemplate": {
+        "msgtype": "markdown",
+        "markdown": {
+          "title": "{{title}}",
+          "text": "**{{title}}**\n\n{{text}}"
+        }
+      }
+    },
+
+    {
+      "_comment": "Example 2: Webhook with Bearer token auth",
+      "name": "secure-webhook",
+      "type": "webhook",
+      "url": "https://notify.your-company.com/api/send",
+      "auth": {
+        "type": "bearer",
+        "token": "${NOTIFY_API_TOKEN}"
+      },
+      "bodyTemplate": {
+        "channel": "{{channelId}}",
+        "message": "{{text}}",
+        "severity": "{{level}}"
+      }
+    },
+
+    {
+      "_comment": "Example 3: Webhook with HMAC-SHA256 signature (common for secure enterprise endpoints)",
+      "name": "hmac-webhook",
+      "type": "webhook",
+      "url": "https://oa.your-company.com/webhook/im",
+      "auth": {
+        "type": "hmac_sha256",
+        "secret": "${IM_HMAC_SECRET}"
+      },
+      "bodyTemplate": {
+        "to": "{{channelId}}",
+        "content": "{{text}}",
+        "contentType": "markdown"
+      }
+    },
+
+    {
+      "_comment": "Example 4: REST API backend (custom enterprise OA / IM gateway)",
+      "name": "enterprise-oa",
+      "type": "rest",
+      "baseUrl": "https://oa.your-company.com/api",
+      "auth": {
+        "type": "api_key",
+        "headerName": "X-App-Token",
+        "token": "${OA_API_TOKEN}"
+      },
+      "endpoints": {
+        "sendMessage": {
+          "method": "POST",
+          "path": "/im/v1/messages",
+          "bodyTemplate": {
+            "receiver": "{{channelId}}",
+            "msgType": "text",
+            "content": "{{text}}"
+          }
+        },
+        "sendNotification": {
+          "method": "POST",
+          "path": "/im/v1/notifications",
+          "bodyTemplate": {
+            "recipients": "{{recipients}}",
+            "title": "{{title}}",
+            "content": "{{text}}",
+            "priority": "{{level}}"
+          }
+        }
+      },
+      "messageIdPath": "data.messageId"
+    },
+
+    {
+      "_comment": "Example 5: Slack incoming webhook",
+      "name": "slack",
+      "type": "webhook",
+      "url": "${SLACK_WEBHOOK_URL}",
+      "auth": { "type": "none" },
+      "bodyTemplate": {
+        "text": "{{text}}",
+        "blocks": [
+          {
+            "type": "section",
+            "text": { "type": "mrkdwn", "text": "*{{title}}*\n{{text}}" }
+          }
+        ]
+      }
+    }
+  ],
+
+  "routes": [
+    {
+      "_comment": "Route urgent alerts to enterprise OA",
+      "pattern": "urgent:*",
+      "backend": "enterprise-oa"
+    },
+    {
+      "_comment": "Route engineering channels to Slack",
+      "pattern": "eng-*",
+      "backend": "slack"
+    },
+    {
+      "_comment": "All other channels use the default webhook",
+      "pattern": "*",
+      "backend": "internal-webhook"
+    }
+  ]
+}

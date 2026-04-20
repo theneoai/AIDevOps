@@ -215,12 +215,27 @@ dingtalk-up:
 	@docker compose -f docker-compose.yml up mcp-dingtalk -d
 	@echo "✓ mcp-dingtalk running on port 3004"
 
+custom-im-up:
+	@echo "=== 启动自定义 IM MCP Server ==="
+	@docker compose -f docker-compose.yml up mcp-custom-im -d
+	@echo "✓ mcp-custom-im running on port 3005"
+	@echo "  /health:   http://localhost:3005/health"
+	@echo "  /metrics:  http://localhost:3005/metrics"
+	@echo "  SSE:       http://localhost:3005/sse"
+
+custom-im-config:
+	@echo "=== 生成自定义 IM 配置文件 ==="
+	@cp enterprise/mcp-servers/mcp-custom-im/im-config.example.json enterprise/mcp-servers/mcp-custom-im/im-config.json
+	@echo "✓ 配置文件已生成: enterprise/mcp-servers/mcp-custom-im/im-config.json"
+	@echo "  请编辑该文件，填写您的 IM 后端信息"
+
 mcp-all-up:
 	@echo "=== 启动全部 MCP Servers ==="
-	@docker compose -f docker-compose.yml up mcp-wechat mcp-feishu mcp-dingtalk -d
-	@echo "✓ mcp-wechat:    http://localhost:3001"
-	@echo "✓ mcp-feishu:    http://localhost:3003"
-	@echo "✓ mcp-dingtalk:  http://localhost:3004"
+	@docker compose -f docker-compose.yml up mcp-wechat mcp-feishu mcp-dingtalk mcp-custom-im -d
+	@echo "✓ mcp-wechat:     http://localhost:3001"
+	@echo "✓ mcp-feishu:     http://localhost:3003"
+	@echo "✓ mcp-dingtalk:   http://localhost:3004"
+	@echo "✓ mcp-custom-im:  http://localhost:3005"
 
 registry-validate:
 	@echo "=== 验证注册表索引 ==="

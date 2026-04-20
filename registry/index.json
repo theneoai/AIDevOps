@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-04-20T00:00:00Z",
+  "updated": "2026-04-20T12:00:00Z",
   "components": [
     {
       "name": "wechat-publisher",
@@ -116,6 +116,21 @@
       "readme": "tools/feishu-publisher/README.md",
       "spec": "tools/feishu-publisher/v1.0.0/spec.yml",
       "requiresSecrets": ["feishu_app_id", "feishu_app_secret"],
+      "minDevKitVersion": "0.3.0"
+    },
+    {
+      "name": "custom-im",
+      "displayName": "Custom IM Connector",
+      "description": "Universal IM integration MCP server — supports webhook, REST API backends with channel routing. Zero-code configuration via im-config.json.",
+      "kind": "Tool",
+      "type": "mcp",
+      "version": "1.0.0",
+      "author": "Dify Team",
+      "tags": ["im", "notification", "webhook", "rest", "routing", "enterprise", "generic"],
+      "path": "tools/custom-im",
+      "readme": "tools/custom-im/README.md",
+      "spec": "tools/custom-im/v1.0.0/spec.yml",
+      "requiresSecrets": [],
       "minDevKitVersion": "0.3.0"
     },
     {
