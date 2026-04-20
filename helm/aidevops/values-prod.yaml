@@ -1,5 +1,5 @@
 image:
-  tag: latest
+  tag: stable
 
 toolService:
   replicas: 3

@@ -22,13 +22,13 @@ groups:
           description: "{{ $labels.job }} error rate is {{ $value | humanizePercentage }}"
 
       - alert: HighMCPConnections
-        expr: mcp_active_connections > 100
+        expr: sum(http_server_active_requests{job=~"mcp-.*"}) > 100
         for: 1m
         labels:
           severity: warning
         annotations:
-          summary: "MCP concurrent connections exceed 100"
-          description: "Current connections: {{ $value }}"
+          summary: "MCP concurrent requests exceed 100"
+          description: "Current active requests: {{ $value }}"
 
       - alert: WeChatPublishFailureRate
         expr: |
@@ -49,3 +49,12 @@ groups:
         annotations:
           summary: "Service {{ $labels.job }} is down"
           description: "Service has been unreachable for more than 1 minute"
+
+      - alert: HighRequestQueueDepth
+        expr: sum(rate(http_requests_total{job=~"enterprise-tool-service|mcp-.*",status="429"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limiting active on {{ $labels.job }}"
+          description: "429 responses detected — upstream may be throttled"

@@ -75,8 +75,9 @@ export class AuditService {
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const limit = options.limit ?? 100;
+    params.push(limit);
     const result = await this.pool.query(
-      `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+      `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC LIMIT $${idx}`,
       params
     );
     return result.rows as AuditEvent[];

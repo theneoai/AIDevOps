@@ -18,6 +18,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { randomUUID } from 'crypto';
 import { OrchestrationDSL, OrchestrationSpec } from '../types/dsl';
 
 // ─────────────────────────────────────────────────────────────
@@ -335,7 +336,7 @@ export class AgentOrchestrator {
 
   async run(task: string, options: OrchestrationOptions = {}): Promise<OrchestrationResult> {
     const startMs = Date.now();
-    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const sessionId = `sess_${randomUUID()}`;
 
     const context: AgentContext = {
       sessionId,

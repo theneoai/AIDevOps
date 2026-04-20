@@ -78,7 +78,17 @@ export class ComponentRegistry {
     const fp = filePath ?? this.lockFilePath;
     if (!fs.existsSync(fp)) return;
 
-    const raw = JSON.parse(fs.readFileSync(fp, 'utf-8')) as RegistryLockFile;
+    let raw: RegistryLockFile;
+    try {
+      raw = JSON.parse(fs.readFileSync(fp, 'utf-8')) as RegistryLockFile;
+    } catch (err) {
+      throw new Error(`Failed to parse registry lock file at ${fp}: ${(err as Error).message}`);
+    }
+
+    if (!raw || !Array.isArray(raw.entries)) {
+      throw new Error(`Registry lock file at ${fp} is malformed: missing 'entries' array`);
+    }
+
     for (const entry of raw.entries) {
       this.entries.set(entry.ref, entry);
     }

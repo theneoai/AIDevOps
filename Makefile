@@ -43,20 +43,20 @@ standalone-down:
 
 # ─── 构建 ───
 build:
-	@docker-compose build
+	@docker compose build
 
 # ─── 企业自研服务 ───
 up:
-	@docker-compose up -d
+	@docker compose up -d
 
 down:
-	@docker-compose down 2>/dev/null || true
+	@docker compose down 2>/dev/null || true
 
 logs:
-	@docker-compose logs -f
+	@docker compose logs -f
 
 status:
-	@docker-compose ps
+	@docker compose ps
 
 health:
 	@echo "Checking enterprise-tool-service..."
@@ -65,10 +65,10 @@ health:
 	@curl -sf http://localhost:3001/health >/dev/null && echo "✓ mcp-wechat is healthy" || echo "✗ mcp-wechat is unhealthy"
 
 restart:
-	@docker-compose restart
+	@docker compose restart
 
 clean:
-	@docker-compose down -v --rmi local
+	@docker compose down -v --rmi local
 
 # ─── 工具注册 ───
 register-tools:
@@ -125,7 +125,7 @@ dify-up:
 dify-down:
 	@echo "=== 停止 Dify 官方服务 ==="
 	@if [ -d "dify/docker" ]; then \
-		cd dify/docker && docker-compose -f docker-compose.yaml -f docker-compose.middleware.yaml down; \
+		cd dify/docker && docker compose -f docker-compose.yaml -f docker-compose.middleware.yaml down; \
 	fi
 
 # ─── 全部服务（Dify + 企业自研）───

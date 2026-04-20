@@ -37,7 +37,8 @@ ingress:
   enabled: true
   className: nginx
   host: aidevops.example.com
-  tls: false
+  tls: true
+  tlsSecretName: aidevops-tls
 
 networkPolicy:
   enabled: true
@@ -48,3 +49,17 @@ hpa:
     minReplicas: 2
     maxReplicas: 10
     cpuUtilization: 70
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

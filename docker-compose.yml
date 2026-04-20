@@ -5,14 +5,12 @@
 #   1. 克隆 Dify 官方仓库到 dify/ 目录（或独立部署）
 #   2. 确保 Dify 使用网络 dify-network
 #   3. 创建 secrets/ 目录并写入密钥文件（见下方 secrets 块说明）
-#   4. 运行: docker-compose up -d
+#   4. 运行: docker compose up -d
 #
 # 密钥文件（不入 git，仅存在于服务器本地）:
 #   secrets/wechat_app_secret.txt   — 微信公众号 AppSecret
 #   secrets/dify_db_password.txt    — PostgreSQL 密码
 # ==================================================================
-
-version: "3.8"
 
 secrets:
   wechat_app_secret:
