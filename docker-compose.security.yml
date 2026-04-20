@@ -1,0 +1,57 @@
+# ==================================================================
+# P2 安全服务栈
+# 启动: docker compose -f docker-compose.yml -f docker-compose.security.yml up -d
+# 或:   make security-up
+# ==================================================================
+
+version: "3.8"
+
+services:
+  # ─── Microsoft Presidio: PII 检测与脱敏 ───
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    container_name: presidio-analyzer
+    ports:
+      - "5010:3000"
+    networks:
+      - dify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    container_name: presidio-anonymizer
+    ports:
+      - "5011:3000"
+    networks:
+      - dify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ─── Guardrails AI: Prompt 注入防御 sidecar ───
+  guardrails:
+    image: guardrailsai/guardrails-server:latest
+    container_name: guardrails
+    ports:
+      - "8010:8000"
+    environment:
+      - GUARDRAILS_TOKEN=${GUARDRAILS_TOKEN:-}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

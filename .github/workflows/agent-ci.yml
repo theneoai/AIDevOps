@@ -240,6 +240,90 @@ jobs:
           languages: javascript-typescript
         continue-on-error: true
 
+      - name: License compliance check
+        working-directory: enterprise/dev-kit
+        run: |
+          npx license-checker --production \
+            --failOn "GPL-2.0;GPL-3.0;AGPL-3.0" \
+            --json > /tmp/license-report.json
+          echo "License check passed"
+        continue-on-error: true
+
+      - name: Verify no hardcoded secrets in .env.example
+        run: |
+          if grep -E "(password|secret|key)\s*=\s*['\"]?[A-Za-z0-9+/]{16,}" \
+               .env.example 2>/dev/null; then
+            echo "::error::Hardcoded secret values detected in .env.example"
+            exit 1
+          fi
+          echo "Secret hygiene check passed"
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: /tmp/license-report.json
+          retention-days: 30
+
+# ─────────────────────────────────────────────────────────────
+# Stage 3b: Container Security Scan + SBOM (after build)
+# ─────────────────────────────────────────────────────────────
+  container-security:
+    name: 'Container Scan + SBOM'
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Container image scan — tool-service (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}/tool-service:sha-${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-tool-service.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+        continue-on-error: true
+
+      - name: Container image scan — mcp-wechat (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}/mcp-wechat:sha-${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-mcp-wechat.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+        continue-on-error: true
+
+      - name: Upload Trivy SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-tool-service.sarif'
+          category: 'container-scanning-tool-service'
+
+      - name: Generate SBOM — tool-service (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: 'ghcr.io/${{ github.repository }}/tool-service:sha-${{ github.sha }}'
+          format: spdx-json
+          output-file: sbom-tool-service.spdx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: |
+            sbom-tool-service.spdx.json
+          retention-days: 90
+
 # ─────────────────────────────────────────────────────────────
 # Stage 4: Build Docker Images
 # ─────────────────────────────────────────────────────────────

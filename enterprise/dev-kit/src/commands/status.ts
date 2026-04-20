@@ -33,7 +33,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       } else {
         for (const provider of status.apiProviders) {
           console.log(`  ${chalk.cyan(provider.name)} ${chalk.gray(`(id: ${provider.id})`)}`);
-          console.log(`    Updated: ${provider.updated_at.toLocaleString()}`);
+          console.log(`    Updated: ${provider.updatedAt.toLocaleString()}`);
         }
       }
 
@@ -44,7 +44,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       } else {
         for (const provider of status.mcpProviders) {
           console.log(`  ${chalk.cyan(provider.name)} ${chalk.gray(`(id: ${provider.id})`)}`);
-          console.log(`    Updated: ${provider.updated_at.toLocaleString()}`);
+          console.log(`    Updated: ${provider.updatedAt.toLocaleString()}`);
         }
       }
 

@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import { requireRole } from '../middleware/rbac';
+import { promptGuard } from '../middleware/prompt-guard';
+import { anonymizeText } from '../pii/presidio-client';
 
 const router = Router();
 
@@ -15,10 +18,12 @@ const router = Router();
  *   - original_length: number - 原始文本长度
  *   - summary_length: number - 摘要长度
  */
-router.post('/tools/summarize', (req, res) => {
-  const { text, max_length = 100 } = req.body;
+router.post('/tools/summarize', requireRole('developer'), promptGuard, async (req, res) => {
+  const rawText: string = req.body.text;
+  const max_length = req.body.max_length ?? 100;
+  const text = await anonymizeText(rawText);
 
-  if (!text || typeof text !== 'string') {
+  if (!rawText || typeof rawText !== 'string') {
     res.status(400).json({
       error: 'Bad Request',
       message: 'text is required and must be a string',
@@ -52,10 +57,12 @@ router.post('/tools/summarize', (req, res) => {
  * Response:
  *   - keywords: string[] - 提取的关键词列表
  */
-router.post('/tools/extract-keywords', (req, res) => {
-  const { text, count = 5 } = req.body;
+router.post('/tools/extract-keywords', requireRole('developer'), promptGuard, async (req, res) => {
+  const rawText: string = req.body.text;
+  const count = req.body.count ?? 5;
+  const text = await anonymizeText(rawText);
 
-  if (!text || typeof text !== 'string') {
+  if (!rawText || typeof rawText !== 'string') {
     res.status(400).json({
       error: 'Bad Request',
       message: 'text is required and must be a string',

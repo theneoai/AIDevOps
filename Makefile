@@ -1,4 +1,4 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-status
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-status observability-up observability-down security-up security-down
 
 # ─── 初始化 ───
 init:
@@ -108,3 +108,27 @@ up-all: dify-up up
 
 down-all: down dify-down
 	@echo "=== 全部服务已停止 ==="
+
+# ─── P1: 可观测性服务 ───
+observability-up:
+	@echo "=== 启动可观测性服务 (Langfuse + Prometheus + Grafana) ==="
+	@docker compose -f docker-compose.yml -f docker-compose.observability.yml up langfuse-server langfuse-db prometheus grafana alertmanager -d
+	@echo "✓ 可观测性服务已启动"
+	@echo "  Langfuse UI:   http://localhost:3002"
+	@echo "  Prometheus:    http://localhost:9090"
+	@echo "  Grafana:       http://localhost:3003  (admin/admin)"
+	@echo "  Alertmanager:  http://localhost:9093"
+
+observability-down:
+	@docker compose -f docker-compose.yml -f docker-compose.observability.yml down langfuse-server langfuse-db prometheus grafana alertmanager
+
+# ─── P2: 安全服务 ───
+security-up:
+	@echo "=== 启动安全服务 (Presidio PII + Guardrails) ==="
+	@docker compose -f docker-compose.yml -f docker-compose.security.yml up presidio-analyzer presidio-anonymizer -d
+	@echo "✓ 安全服务已启动"
+	@echo "  Presidio Analyzer:   http://localhost:5010"
+	@echo "  Presidio Anonymizer: http://localhost:5011"
+
+security-down:
+	@docker compose -f docker-compose.yml -f docker-compose.security.yml down presidio-analyzer presidio-anonymizer guardrails

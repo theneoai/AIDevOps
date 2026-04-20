@@ -1,4 +1,6 @@
+import './tracer'; // must be first import — initializes OTel SDK before any other module
 import express from 'express';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
@@ -72,49 +74,57 @@ function createMcpServer(): Server {
     return { tools };
   });
 
+  const tracer = trace.getTracer('mcp-wechat', '1.0.0');
+
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     logger.info('Tool called', { tool: name });
 
-    try {
-      let result: Record<string, unknown> | unknown;
+    return tracer.startActiveSpan(`tool.${name}`, async (span) => {
+      span.setAttributes({
+        'tool.name': name,
+        'mcp.transport': 'sse',
+        'tenant.id': process.env.TENANT_ID ?? 'default',
+      });
+      try {
+        let result: Record<string, unknown> | unknown;
 
-      switch (name) {
-        case 'publish_article':
-          result = await handlePublishArticle(args as unknown as PublishArticleParams);
-          break;
-        case 'upload_image':
-          result = await handleUploadImage(args as unknown as UploadImageParams);
-          break;
-        case 'get_access_token':
-          result = await handleGetAccessToken();
-          break;
-        default:
-          throw new Error(`Unknown tool: ${name}`);
+        switch (name) {
+          case 'publish_article':
+            result = await handlePublishArticle(args as unknown as PublishArticleParams);
+            break;
+          case 'upload_image':
+            result = await handleUploadImage(args as unknown as UploadImageParams);
+            break;
+          case 'get_access_token':
+            result = await handleGetAccessToken();
+            break;
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
+
+        span.setStatus({ code: SpanStatusCode.OK });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Tool execution failed', { tool: name, error: errorMessage });
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ status: 'failed', error_message: errorMessage }, null, 2),
+            },
+          ],
+          isError: true,
+        };
+      } finally {
+        span.end();
       }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Tool execution failed', { tool: name, error: errorMessage });
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ status: 'failed', error_message: errorMessage }, null, 2),
-          },
-        ],
-        isError: true,
-      };
-    }
+    });
   });
 
   return server;
