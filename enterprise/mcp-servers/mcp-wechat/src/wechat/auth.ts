@@ -1,12 +1,50 @@
 import axios from 'axios';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { config } from '../config';
 import { createLogger } from '../logger';
 import { WeChatAccessTokenResponse } from '../types/wechat';
 
 const logger = createLogger(config.LOG_LEVEL);
 
+const TOKEN_CACHE_FILE = '/tmp/wechat_token_cache.json';
+
+interface TokenCache {
+  token: string;
+  expiresAt: number;
+}
+
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0;
+
+function loadCacheFromDisk(): void {
+  try {
+    if (existsSync(TOKEN_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(TOKEN_CACHE_FILE, 'utf-8')) as TokenCache;
+      const now = Date.now();
+      if (data.token && data.expiresAt > now + 5 * 60 * 1000) {
+        cachedToken = data.token;
+        tokenExpiresAt = data.expiresAt;
+        logger.info('Restored access token from disk cache', {
+          expires_at: new Date(tokenExpiresAt).toISOString(),
+        });
+      }
+    }
+  } catch {
+    logger.warn('Failed to read token cache from disk, will fetch fresh token');
+  }
+}
+
+function saveCacheToDisk(token: string, expiresAt: number): void {
+  try {
+    const data: TokenCache = { token, expiresAt };
+    writeFileSync(TOKEN_CACHE_FILE, JSON.stringify(data), { mode: 0o600 });
+  } catch {
+    logger.warn('Failed to persist token cache to disk');
+  }
+}
+
+// Restore token on module load so restarts don't immediately re-fetch
+loadCacheFromDisk();
 
 export async function getAccessToken(): Promise<string> {
   const now = Date.now();
@@ -42,6 +80,8 @@ export async function getAccessToken(): Promise<string> {
     cachedToken = data.access_token;
     tokenExpiresAt = now + data.expires_in * 1000;
 
+    saveCacheToDisk(cachedToken, tokenExpiresAt);
+
     logger.info('Successfully fetched and cached access token', {
       expires_in: data.expires_in,
       expires_at: new Date(tokenExpiresAt).toISOString(),
@@ -60,5 +100,12 @@ export async function getAccessToken(): Promise<string> {
 export function clearTokenCache(): void {
   cachedToken = null;
   tokenExpiresAt = 0;
+  try {
+    if (existsSync(TOKEN_CACHE_FILE)) {
+      writeFileSync(TOKEN_CACHE_FILE, JSON.stringify({}), { mode: 0o600 });
+    }
+  } catch {
+    // ignore
+  }
   logger.debug('Token cache cleared');
 }
