@@ -22,11 +22,26 @@ export interface DifyDatabaseConfig {
 }
 
 export interface DifyConfig {
-  /** Dify API base URL */
+  /** Dify API base URL (used by DifyApiAdapter) */
   apiUrl: string;
   /** Dify Console URL */
   consoleUrl: string;
-  /** PostgreSQL connection settings */
+  /**
+   * Dify API key for REST adapter authentication.
+   * Set via DIFY_API_KEY env var or dify.apiKey in dify-dev.yaml.
+   */
+  apiKey?: string;
+  /**
+   * Base URL for the Dify REST API (e.g. http://localhost/v1).
+   * Defaults to apiUrl when not set explicitly.
+   */
+  baseUrl?: string;
+  /**
+   * Adapter implementation: 'api' (default, recommended) or 'db' (@deprecated).
+   * 'db' bypasses Dify API validation and breaks on Dify schema upgrades.
+   */
+  adapter?: 'api' | 'db';
+  /** PostgreSQL connection settings (used by DifyDbAdapter only) */
   db: DifyDatabaseConfig;
 }
 
@@ -45,12 +60,15 @@ const DEFAULT_CONFIG: DevKitConfig = {
   dify: {
     apiUrl: 'http://localhost:5001',
     consoleUrl: 'http://localhost',
+    apiKey: '${DIFY_API_KEY:-}',
+    baseUrl: '${DIFY_BASE_URL:-http://localhost/v1}',
+    adapter: 'api',
     db: {
-      host: 'localhost',
+      host: '${DIFY_DB_HOST:-localhost}',
       port: 5432,
-      user: 'postgres',
-      password: 'difyai123456',
-      database: 'dify',
+      user: '${DIFY_DB_USER:-postgres}',
+      password: '${DIFY_DB_PASSWORD:-difyai123456}',
+      database: '${DIFY_DB_NAME:-dify}',
     },
   },
   componentsDir: './enterprise/components',

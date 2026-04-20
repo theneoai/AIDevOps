@@ -4,12 +4,21 @@
 # 使用方式:
 #   1. 克隆 Dify 官方仓库到 dify/ 目录（或独立部署）
 #   2. 确保 Dify 使用网络 dify-network
-#   3. 运行: docker-compose up -d
+#   3. 创建 secrets/ 目录并写入密钥文件（见下方 secrets 块说明）
+#   4. 运行: docker-compose up -d
 #
-# 注意: Dify 官方服务通过 Docker Compose include 导入
+# 密钥文件（不入 git，仅存在于服务器本地）:
+#   secrets/wechat_app_secret.txt   — 微信公众号 AppSecret
+#   secrets/dify_db_password.txt    — PostgreSQL 密码
 # ==================================================================
 
 version: "3.8"
+
+secrets:
+  wechat_app_secret:
+    file: ./secrets/wechat_app_secret.txt
+  dify_db_password:
+    file: ./secrets/dify_db_password.txt
 
 services:
   # ─── 企业自研: 通用 Tool 服务 ───
@@ -40,9 +49,11 @@ services:
     container_name: mcp-wechat
     ports:
       - "3001:3000"
+    secrets:
+      - wechat_app_secret
     environment:
       - WECHAT_APP_ID=${WECHAT_APP_ID:-}
-      - WECHAT_APP_SECRET=${WECHAT_APP_SECRET:-}
+      # WECHAT_APP_SECRET 已移除 — 由 /run/secrets/wechat_app_secret 读取
       - MCP_SERVER_PORT=3000
       - MCP_SERVER_PATH=/sse
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -66,10 +77,13 @@ services:
       - ./enterprise/components:/app/components:ro
       - ./enterprise/dev-kit/dify-dev.yaml:/app/dify-dev.yaml:ro
     environment:
+      - DIFY_BASE_URL=${DIFY_BASE_URL:-http://nginx/v1}
+      - DIFY_API_KEY=${DIFY_API_KEY:-}
+      # DB 变量保留作为 adapter=db 的兜底（已弃用）
       - DIFY_DB_HOST=${DIFY_DB_HOST:-db_postgres}
       - DIFY_DB_PORT=${DIFY_DB_PORT:-5432}
       - DIFY_DB_USER=${DIFY_DB_USER:-postgres}
-      - DIFY_DB_PASSWORD=${DIFY_DB_PASSWORD:-difyai123456}
+      - DIFY_DB_PASSWORD=${DIFY_DB_PASSWORD:-}
       - DIFY_DB_NAME=${DIFY_DB_NAME:-dify}
     networks:
       - dify-network

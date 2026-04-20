@@ -96,6 +96,65 @@ jobs:
           path: /tmp/typecheck.log
 
 # ─────────────────────────────────────────────────────────────
+# Stage 1b: Dify Compatibility Check (on Dify upgrade commits)
+# ─────────────────────────────────────────────────────────────
+  dify-compat:
+    name: 'Dify Compatibility Check'
+    runs-on: ubuntu-latest
+    needs: [validate]
+    if: contains(github.event.head_commit.message, '[dify-upgrade]') || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: difyai123456
+          POSTGRES_DB: dify
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: enterprise/dev-kit/package-lock.json
+
+      - name: Install dependencies
+        working-directory: enterprise/dev-kit
+        run: npm ci
+
+      - name: Verify DIFY_VERSION matches submodule
+        run: |
+          PINNED=$(cat DIFY_VERSION | awk '{print $1}')
+          CURRENT=$(git -C dify rev-parse HEAD)
+          echo "Pinned:  $PINNED"
+          echo "Current: $CURRENT"
+          if [ "$PINNED" != "$CURRENT" ]; then
+            echo "::warning::Dify submodule SHA differs from DIFY_VERSION. Running contract tests."
+          fi
+
+      - name: Run contract tests
+        working-directory: enterprise/dev-kit
+        run: npm test -- --testPathPattern=contract --runInBand --forceExit
+        env:
+          DIFY_DB_HOST: localhost
+          DIFY_DB_PORT: '5432'
+          DIFY_DB_USER: postgres
+          DIFY_DB_PASSWORD: difyai123456
+          DIFY_DB_NAME: dify
+
+# ─────────────────────────────────────────────────────────────
 # Stage 2: Unit Tests
 # ─────────────────────────────────────────────────────────────
   test-unit:
