@@ -1,5 +1,7 @@
 [submodule "dify"]
 	path = dify
 	url = https://github.com/langgenius/dify.git
-	branch = main
 	shallow = true
+	# branch tracking removed — submodule is pinned to a specific commit SHA.
+	# To upgrade: run enterprise/dev-kit/scripts/check-dify-compat.sh first,
+	# then update DIFY_VERSION with the new SHA.

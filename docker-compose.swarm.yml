@@ -1,0 +1,63 @@
+# ==================================================================
+# Docker Swarm 部署叠加配置（P3-1 Phase A）
+# 用法: docker stack deploy -c docker-compose.yml -c docker-compose.swarm.yml aidevops
+# 或:   make swarm-deploy
+# ==================================================================
+
+version: "3.8"
+
+services:
+  enterprise-tool-service:
+    image: ghcr.io/theneoai/aidevops/tool-service:${VERSION:-latest}
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+        delay: 5s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  mcp-wechat:
+    image: ghcr.io/theneoai/aidevops/mcp-wechat:${VERSION:-latest}
+    deploy:
+      replicas: 1
+      # SSE needs session affinity — single replica until P3-4 StreamableHTTP migration
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

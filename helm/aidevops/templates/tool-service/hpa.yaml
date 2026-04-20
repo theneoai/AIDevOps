@@ -1,0 +1,20 @@
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tool-service-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tool-service
+  minReplicas: {{ .Values.hpa.toolService.minReplicas }}
+  maxReplicas: {{ .Values.hpa.toolService.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.toolService.cpuUtilization }}
+{{- end }}

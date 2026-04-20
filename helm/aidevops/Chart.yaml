@@ -1,0 +1,15 @@
+apiVersion: v2
+name: aidevops
+description: AIDevOps Enterprise Agent Framework
+type: application
+version: 0.3.0
+appVersion: "0.3.0"
+keywords:
+  - ai
+  - agents
+  - mcp
+  - dify
+home: https://github.com/theneoai/AIDevOps
+maintainers:
+  - name: theneoai
+    url: https://github.com/theneoai

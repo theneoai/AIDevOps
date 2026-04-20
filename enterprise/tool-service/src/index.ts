@@ -1,3 +1,4 @@
+import './tracer'; // must be first import — initializes OTel SDK before Express
 import express, { Request, Response, NextFunction } from 'express';
 import { config } from './config';
 import { createLogger } from './logger';

@@ -1,0 +1,50 @@
+apiVersion: dify.enterprise/v1
+kind: Chatflow
+metadata:
+  name: rag-qa-chatflow
+  description: 基于知识库的 RAG 问答 Chatflow，支持多轮对话和引用溯源
+  author: enterprise
+  tags: [rag, knowledge-base, chatflow, template]
+
+spec:
+  model:
+    provider: openai
+    name: gpt-4o
+    temperature: 0.1
+    maxTokens: 2048
+
+  systemPrompt: |
+    你是一名知识库问答助手。
+    请仅基于提供的知识库内容回答问题。
+    如果知识库中没有相关信息，请明确告知用户，不要凭空编造。
+    在回答末尾，标注信息来源的文档名称。
+
+  nodes:
+    - id: retrieve
+      type: knowledge-retrieval
+      data:
+        knowledgeBaseId: "{{KNOWLEDGE_BASE_ID}}"
+        topK: 5
+        scoreThreshold: 0.6
+
+    - id: llm
+      type: llm
+      data:
+        promptRef: rag-qa-system-prompt
+        contextFrom: retrieve
+
+    - id: answer
+      type: answer
+      data:
+        showSources: true
+
+  inputs:
+    - name: query
+      type: string
+      description: 用户问题
+      required: true
+
+  variables:
+    KNOWLEDGE_BASE_ID:
+      description: Dify 知识库 ID
+      required: true

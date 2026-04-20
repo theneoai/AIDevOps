@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-wechat-config
+data:
+  LOG_LEVEL: {{ .Values.mcpWechat.env.LOG_LEVEL | quote }}
+  NODE_ENV: {{ .Values.mcpWechat.env.NODE_ENV | quote }}
+  OTEL_ENABLED: {{ .Values.mcpWechat.env.OTEL_ENABLED | quote }}
+  MCP_SERVER_PORT: {{ .Values.mcpWechat.port | quote }}
+  MCP_SERVER_PATH: "/sse"

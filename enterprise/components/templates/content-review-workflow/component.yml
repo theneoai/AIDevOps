@@ -1,0 +1,67 @@
+apiVersion: dify.enterprise/v1
+kind: Workflow
+metadata:
+  name: content-review-workflow
+  description: 内容合规审核流水线，支持文本、图片 URL 的多维度审核
+  author: enterprise
+  tags: [content-moderation, compliance, workflow, template]
+
+spec:
+  steps:
+    - name: pii-scan
+      type: tool
+      tool: ref:enterprise-tool-service.summarize
+      input:
+        text: "{{input.content}}"
+      description: 提取内容摘要，同时触发 PII 脱敏
+
+    - name: keyword-check
+      type: tool
+      tool: ref:enterprise-tool-service.extract-keywords
+      input:
+        text: "{{input.content}}"
+        count: 20
+
+    - name: llm-review
+      type: llm
+      model:
+        provider: openai
+        name: gpt-4o-mini
+        temperature: 0
+      prompt: |
+        请审核以下内容是否符合平台规范：
+        内容摘要: {{pii-scan.summary}}
+        关键词: {{keyword-check.keywords}}
+        原文（已脱敏）: {{input.content}}
+
+        审核维度：
+        1. 是否含有违禁词汇或敏感内容
+        2. 是否存在明显的广告或营销欺诈
+        3. 是否涉及歧视、仇恨言论
+
+        请返回 JSON：{"approved": true/false, "reason": "...", "risk_level": "low|medium|high"}
+
+    - name: hitl-gate
+      type: human-review
+      condition: "{{llm-review.risk_level}} == 'high'"
+      approvers: ["content-team@example.com"]
+      timeout: 24h
+      onTimeout: reject
+
+  inputs:
+    - name: content
+      type: string
+      description: 待审核的文本内容
+      required: true
+    - name: content_id
+      type: string
+      description: 内容 ID（用于审计追踪）
+      required: true
+
+  outputs:
+    - name: approved
+      type: boolean
+    - name: reason
+      type: string
+    - name: risk_level
+      type: string

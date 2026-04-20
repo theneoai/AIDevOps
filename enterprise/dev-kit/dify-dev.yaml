@@ -1,9 +1,31 @@
-# Dify DevKit Configuration
-# Place this file in your project root or enterprise/dev-kit/
+# DevKit Configuration
+# This file is read by `dify-dev` CLI.
+# Place it in your project root or enterprise/dev-kit/.
+#
+# ─── Deployment modes ────────────────────────────────────────
+# Mode A: With Dify (full registration)
+#   Set dify.baseUrl + dify.apiKey, adapter: api
+#
+# Mode B: Standalone (no Dify, offline validation only)
+#   Leave dify.baseUrl empty or unset.
+#   `dify-dev status --offline` and `dify-dev validate` work without Dify.
+#
+# Mode C: Local DB (deprecated, Dify v0.x compat only)
+#   Set dify.adapter: db + dify.db.*
+# ─────────────────────────────────────────────────────────────
 
+# Backend platform settings (key is `dify:` for backward compat)
 dify:
-  apiUrl: "http://api:5001"
-  consoleUrl: "http://console"
+  # REST API base URL — leave empty for offline/standalone mode
+  baseUrl: "${DIFY_BASE_URL:-}"
+  apiKey: "${DIFY_API_KEY:-}"
+  adapter: "api"   # api (default) | db (deprecated)
+
+  # apiUrl / consoleUrl used as fallback when baseUrl is unset
+  apiUrl: "${DIFY_API_URL:-http://localhost/v1}"
+  consoleUrl: "${DIFY_CONSOLE_URL:-http://localhost}"
+
+  # DB settings (only used when adapter: db — deprecated)
   db:
     host: "${DIFY_DB_HOST:-db_postgres}"
     port: ${DIFY_DB_PORT:-5432}
@@ -11,4 +33,5 @@ dify:
     password: "${DIFY_DB_PASSWORD:-difyai123456}"
     database: "${DIFY_DB_NAME:-dify}"
 
-componentsDir: "./components"
+# Local component directory (relative to this file or project root)
+componentsDir: "./enterprise/components"

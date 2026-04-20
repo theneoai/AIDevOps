@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-wechat
+  labels:
+    app: mcp-wechat
+    app.kubernetes.io/part-of: aidevops
+spec:
+  replicas: {{ .Values.mcpWechat.replicas }}
+  selector:
+    matchLabels:
+      app: mcp-wechat
+  template:
+    metadata:
+      labels:
+        app: mcp-wechat
+        app.kubernetes.io/part-of: aidevops
+    spec:
+      # Node affinity: keep SSE connections on dedicated node until StreamableHTTP migration
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: aidevops/mcp-node
+                    operator: In
+                    values: ["true"]
+      containers:
+        - name: mcp-wechat
+          image: "{{ .Values.image.registry }}/mcp-wechat:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.mcpWechat.port }}
+              name: http
+          resources:
+            {{- toYaml .Values.mcpWechat.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: mcp-wechat-config
+          env:
+            - name: WECHAT_APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: aidevops-secrets
+                  key: wechat-app-secret
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aidevops-secrets
+                  key: langfuse-secret-key
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mcpWechat.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.mcpWechat.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10

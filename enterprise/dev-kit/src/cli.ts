@@ -12,16 +12,20 @@ import { deployCommand } from './commands/deploy';
 import { statusCommand } from './commands/status';
 import { validateCommand } from './commands/validate';
 import { testRunCommand } from './commands/test-run';
+import { watchCommand } from './commands/watch';
+import { syncPromptsCommand } from './commands/sync-prompts';
+import { searchCommand, installCommand, publishCommand } from './commands/registry';
 
 const program = new Command();
 
 program
   .name('dify-dev')
   .description('Dify DevKit - CLI tool for creating Dify components via code')
-  .version('0.2.0')
+  .version('0.3.0')
   .option('-c, --config <path>', 'Path to configuration file')
   .option('-v, --verbose', 'Enable verbose output', false)
-  .option('--dry-run', 'Show what would be done without making changes', false);
+  .option('--dry-run', 'Show what would be done without making changes', false)
+  .option('--tenant <name>', 'Target tenant name (multi-tenancy)');
 
 // ─────────────────────────────────────────────────────────────
 // Create Command
@@ -74,11 +78,13 @@ program
 
 program
   .command('status')
-  .description('Show status of all deployed components')
-  .action(async () => {
+  .description('Show status of deployed components (use --offline to skip Dify connection)')
+  .option('--offline', 'Show local component files without connecting to Dify', false)
+  .action(async (options: { offline: boolean }) => {
     await statusCommand({
       configPath: program.opts().config,
       verbose: program.opts().verbose,
+      offline: options.offline,
     });
   });
 
@@ -121,6 +127,79 @@ program
       mockFile: options.mockFile,
       output: options.output,
       maxRounds: options.maxRounds ? parseInt(options.maxRounds, 10) : undefined,
+    });
+  });
+
+// ─────────────────────────────────────────────────────────────
+// Watch Command (P4-2: hot reload)
+// ─────────────────────────────────────────────────────────────
+
+program
+  .command('watch')
+  .description('Watch component files and hot-deploy on change')
+  .option('-p, --pattern <glob>', 'File glob pattern to watch', 'enterprise/components/**/*.yml')
+  .option('-d, --debounce <ms>', 'Debounce delay in ms', '500')
+  .action(async (options: { pattern: string; debounce: string }) => {
+    await watchCommand({
+      pattern: options.pattern,
+      debounce: parseInt(options.debounce, 10),
+      verbose: program.opts().verbose,
+    });
+  });
+
+// ─────────────────────────────────────────────────────────────
+// Sync Prompts Command (P4-3: Langfuse integration)
+// ─────────────────────────────────────────────────────────────
+
+program
+  .command('sync-prompts')
+  .description('Pull latest prompt versions from Langfuse into component DSL')
+  .argument('<component>', 'Path to component YAML file')
+  .action(async (componentPath: string) => {
+    await syncPromptsCommand(componentPath, {
+      dryRun: program.opts().dryRun,
+      verbose: program.opts().verbose,
+    });
+  });
+
+// ─────────────────────────────────────────────────────────────
+// Registry Commands (P5-2: component marketplace)
+// ─────────────────────────────────────────────────────────────
+
+program
+  .command('search')
+  .description('Search the component registry')
+  .argument('<query>', 'Search query (name, tag, or keyword)')
+  .option('-r, --registry <url>', 'Custom registry index URL')
+  .action(async (query: string, options: { registry?: string }) => {
+    await searchCommand(query, {
+      registryUrl: options.registry,
+      verbose: program.opts().verbose,
+    });
+  });
+
+program
+  .command('install')
+  .description('Install a component from the registry')
+  .argument('<name[@version]>', 'Component name and optional version (e.g. wechat-publisher@1.0.0)')
+  .option('-r, --registry <url>', 'Custom registry index URL')
+  .action(async (nameVersion: string, options: { registry?: string }) => {
+    await installCommand(nameVersion, {
+      registryUrl: options.registry,
+      verbose: program.opts().verbose,
+    });
+  });
+
+program
+  .command('publish')
+  .description('Publish a component to the registry (runs quality gate first)')
+  .argument('<path>', 'Path to component directory or component.yml file')
+  .option('-r, --registry <url>', 'Custom registry index URL')
+  .action(async (componentPath: string, options: { registry?: string }) => {
+    await publishCommand(componentPath, {
+      registryUrl: options.registry,
+      dryRun: program.opts().dryRun,
+      verbose: program.opts().verbose,
     });
   });
 

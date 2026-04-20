@@ -1,0 +1,79 @@
+{
+  "name": "vscode-dify-dev",
+  "displayName": "Dify DevKit",
+  "description": "DSL syntax support, validation, and one-click deploy for the AIDevOps Enterprise Agent Framework",
+  "version": "0.1.0",
+  "publisher": "theneoai",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Linters", "Other"],
+  "keywords": ["dify", "agent", "mcp", "yaml", "aidevops"],
+  "activationEvents": [
+    "onLanguage:yaml",
+    "workspaceContains:dify-dev.yaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "difyDev.deploy",
+        "title": "Dify: Deploy Component",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "difyDev.validate",
+        "title": "Dify: Validate Component"
+      },
+      {
+        "command": "difyDev.watch",
+        "title": "Dify: Start Watch Mode"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "difyDev.deploy",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorTextFocus && resourceExtname == .yml"
+      }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": "enterprise/components/**/*.yml",
+        "url": "./schemas/tool.schema.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "yaml",
+        "scopeName": "source.dify-dsl",
+        "path": "./syntaxes/dify-dsl.tmGrammar.json",
+        "embeddedLanguages": {}
+      }
+    ],
+    "configuration": {
+      "title": "Dify DevKit",
+      "properties": {
+        "difyDev.devkitPath": {
+          "type": "string",
+          "default": "npx dify-dev",
+          "description": "Path or command to the dify-dev CLI"
+        },
+        "difyDev.autoValidate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate DSL on save"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -watch -p tsconfig.json",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

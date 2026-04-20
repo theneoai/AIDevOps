@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-service
+  labels:
+    app: tool-service
+    app.kubernetes.io/part-of: aidevops
+spec:
+  replicas: {{ .Values.toolService.replicas }}
+  selector:
+    matchLabels:
+      app: tool-service
+  template:
+    metadata:
+      labels:
+        app: tool-service
+        app.kubernetes.io/part-of: aidevops
+    spec:
+      containers:
+        - name: tool-service
+          image: "{{ .Values.image.registry }}/tool-service:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.toolService.port }}
+              name: http
+          resources:
+            {{- toYaml .Values.toolService.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: tool-service-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: aidevops-secrets
+                  key: jwt-secret
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aidevops-secrets
+                  key: langfuse-secret-key
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.toolService.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.toolService.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3

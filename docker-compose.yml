@@ -4,12 +4,25 @@
 # 使用方式:
 #   1. 克隆 Dify 官方仓库到 dify/ 目录（或独立部署）
 #   2. 确保 Dify 使用网络 dify-network
-#   3. 运行: docker-compose up -d
+#   3. 创建 secrets/ 目录并写入密钥文件（见下方 secrets 块说明）
+#   4. 运行: docker-compose up -d
 #
-# 注意: Dify 官方服务通过 Docker Compose include 导入
+# 密钥文件（不入 git，仅存在于服务器本地）:
+#   secrets/wechat_app_secret.txt   — 微信公众号 AppSecret
+#   secrets/dify_db_password.txt    — PostgreSQL 密码
 # ==================================================================
 
 version: "3.8"
+
+secrets:
+  wechat_app_secret:
+    file: ./secrets/wechat_app_secret.txt
+  dify_db_password:
+    file: ./secrets/dify_db_password.txt
+  feishu_app_secret:
+    file: ./secrets/feishu_app_secret.txt
+  dingtalk_app_secret:
+    file: ./secrets/dingtalk_app_secret.txt
 
 services:
   # ─── 企业自研: 通用 Tool 服务 ───
@@ -40,9 +53,11 @@ services:
     container_name: mcp-wechat
     ports:
       - "3001:3000"
+    secrets:
+      - wechat_app_secret
     environment:
       - WECHAT_APP_ID=${WECHAT_APP_ID:-}
-      - WECHAT_APP_SECRET=${WECHAT_APP_SECRET:-}
+      # WECHAT_APP_SECRET 已移除 — 由 /run/secrets/wechat_app_secret 读取
       - MCP_SERVER_PORT=3000
       - MCP_SERVER_PATH=/sse
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -57,6 +72,89 @@ services:
       retries: 3
       start_period: 10s
 
+  # ─── 企业自研: 飞书 MCP ───
+  mcp-feishu:
+    build:
+      context: ./enterprise/mcp-servers/mcp-feishu
+    container_name: mcp-feishu
+    ports:
+      - "3003:3003"
+    secrets:
+      - feishu_app_secret
+    environment:
+      - PORT=3003
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    profiles:
+      - feishu
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ─── 企业自研: 钉钉 MCP ───
+  mcp-dingtalk:
+    build:
+      context: ./enterprise/mcp-servers/mcp-dingtalk
+    container_name: mcp-dingtalk
+    ports:
+      - "3004:3004"
+    secrets:
+      - dingtalk_app_secret
+    environment:
+      - PORT=3004
+      - DINGTALK_APP_KEY=${DINGTALK_APP_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    profiles:
+      - dingtalk
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ─── 企业自研: 自定义 IM MCP ───
+  mcp-custom-im:
+    build:
+      context: ./enterprise/mcp-servers/mcp-custom-im
+    container_name: mcp-custom-im
+    ports:
+      - "3005:3005"
+    volumes:
+      # Mount your im-config.json at runtime (not baked into image)
+      - ${IM_CONFIG_PATH:-./enterprise/mcp-servers/mcp-custom-im/im-config.json}:/app/im-config.json:ro
+    environment:
+      - PORT=3005
+      - IM_CONFIG_PATH=/app/im-config.json
+      # Fallback: single-webhook mode (used when im-config.json is absent)
+      - IM_WEBHOOK_URL=${IM_WEBHOOK_URL:-}
+      - IM_WEBHOOK_TOKEN=${IM_WEBHOOK_TOKEN:-}
+      - IM_WEBHOOK_AUTH=${IM_WEBHOOK_AUTH:-none}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    profiles:
+      - custom-im
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   # ─── 企业自研: DevKit CLI 工具 ───
   devkit:
     build:
@@ -66,10 +164,13 @@ services:
       - ./enterprise/components:/app/components:ro
       - ./enterprise/dev-kit/dify-dev.yaml:/app/dify-dev.yaml:ro
     environment:
+      - DIFY_BASE_URL=${DIFY_BASE_URL:-http://nginx/v1}
+      - DIFY_API_KEY=${DIFY_API_KEY:-}
+      # DB 变量保留作为 adapter=db 的兜底（已弃用）
       - DIFY_DB_HOST=${DIFY_DB_HOST:-db_postgres}
       - DIFY_DB_PORT=${DIFY_DB_PORT:-5432}
       - DIFY_DB_USER=${DIFY_DB_USER:-postgres}
-      - DIFY_DB_PASSWORD=${DIFY_DB_PASSWORD:-difyai123456}
+      - DIFY_DB_PASSWORD=${DIFY_DB_PASSWORD:-}
       - DIFY_DB_NAME=${DIFY_DB_NAME:-dify}
     networks:
       - dify-network

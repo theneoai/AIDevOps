@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: aidevops
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - env: staging
+            namespace: aidevops-staging
+            valuesFile: values-staging.yaml
+          - env: production
+            namespace: aidevops-production
+            valuesFile: values-prod.yaml
+  template:
+    metadata:
+      name: "aidevops-{{env}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/theneoai/AIDevOps
+        targetRevision: HEAD
+        path: helm/aidevops
+        helm:
+          valueFiles:
+            - "{{valuesFile}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 3
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

@@ -13,7 +13,11 @@ import * as yaml from 'yaml';
 // Type-safe Config Interface
 // ─────────────────────────────────────────────────────────────
 
-export interface DifyDatabaseConfig {
+// ─────────────────────────────────────────────────────────────
+// Platform-agnostic database config (used only by the deprecated db adapter)
+// ─────────────────────────────────────────────────────────────
+
+export interface DatabaseConfig {
   host: string;
   port: number;
   user: string;
@@ -21,18 +25,46 @@ export interface DifyDatabaseConfig {
   database: string;
 }
 
-export interface DifyConfig {
-  /** Dify API base URL */
+/** @deprecated Use DatabaseConfig */
+export type DifyDatabaseConfig = DatabaseConfig;
+
+// ─────────────────────────────────────────────────────────────
+// Backend (platform) config
+// Keyed as `dify:` in dify-dev.yaml for backward compat, but the
+// interface is platform-agnostic so backends other than Dify can be
+// introduced without touching the schema.
+// ─────────────────────────────────────────────────────────────
+
+export interface BackendConfig {
+  /** Backend REST API base URL (e.g. http://localhost/v1 for Dify) */
   apiUrl: string;
-  /** Dify Console URL */
+  /** Console/UI base URL */
   consoleUrl: string;
-  /** PostgreSQL connection settings */
-  db: DifyDatabaseConfig;
+  /** API key for Bearer-token authenticated REST adapters */
+  apiKey?: string;
+  /**
+   * Alias for apiUrl — some config files use baseUrl, some use apiUrl.
+   * When both are set, baseUrl takes precedence.
+   */
+  baseUrl?: string;
+  /**
+   * Adapter implementation: 'api' (default) or 'db' (@deprecated, Dify-specific).
+   * 'db' bypasses API validation and breaks on schema upgrades.
+   */
+  adapter?: 'api' | 'db';
+  /** PostgreSQL connection — used by the deprecated db adapter only */
+  db: DatabaseConfig;
 }
 
+/** @deprecated Use BackendConfig */
+export type DifyConfig = BackendConfig;
+
 export interface DevKitConfig {
-  /** Dify platform settings */
-  dify: DifyConfig;
+  /**
+   * Backend platform settings.
+   * Config key is `dify:` in dify-dev.yaml for backward compatibility.
+   */
+  dify: BackendConfig;
   /** Directory containing component definitions */
   componentsDir: string;
 }
@@ -45,12 +77,15 @@ const DEFAULT_CONFIG: DevKitConfig = {
   dify: {
     apiUrl: 'http://localhost:5001',
     consoleUrl: 'http://localhost',
+    apiKey: '${DIFY_API_KEY:-}',
+    baseUrl: '${DIFY_BASE_URL:-http://localhost/v1}',
+    adapter: 'api',
     db: {
-      host: 'localhost',
+      host: '${DIFY_DB_HOST:-localhost}',
       port: 5432,
-      user: 'postgres',
-      password: 'difyai123456',
-      database: 'dify',
+      user: '${DIFY_DB_USER:-postgres}',
+      password: '${DIFY_DB_PASSWORD:-difyai123456}',
+      database: '${DIFY_DB_NAME:-dify}',
     },
   },
   componentsDir: './enterprise/components',

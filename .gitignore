@@ -33,3 +33,6 @@ coverage/
 
 # Docker
 .dockerignore
+
+# Secrets — never commit these files
+secrets/

@@ -1,0 +1,51 @@
+groups:
+  - name: llm_alerts
+    rules:
+      - alert: HighToolLatency
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=~"enterprise-tool-service|mcp-wechat"}[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tool service P99 latency exceeds 5s"
+          description: "{{ $labels.job }} P99 latency is {{ $value | humanizeDuration }}"
+
+      - alert: HighToolErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5..",job=~"enterprise-tool-service|mcp-wechat"}[5m])
+          / rate(http_requests_total{job=~"enterprise-tool-service|mcp-wechat"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tool call error rate exceeds 5%"
+          description: "{{ $labels.job }} error rate is {{ $value | humanizePercentage }}"
+
+      - alert: HighMCPConnections
+        expr: mcp_active_connections > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP concurrent connections exceed 100"
+          description: "Current connections: {{ $value }}"
+
+      - alert: WeChatPublishFailureRate
+        expr: |
+          rate(mcp_tool_calls_total{tool="publish_article",result="error"}[10m])
+          / rate(mcp_tool_calls_total{tool="publish_article"}[10m]) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WeChat article publish failure rate exceeds 10%"
+          description: "Failure rate: {{ $value | humanizePercentage }}"
+
+      - alert: ServiceDown
+        expr: up{job=~"enterprise-tool-service|mcp-wechat"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service has been unreachable for more than 1 minute"
