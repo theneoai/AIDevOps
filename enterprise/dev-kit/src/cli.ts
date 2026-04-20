@@ -14,6 +14,7 @@ import { validateCommand } from './commands/validate';
 import { testRunCommand } from './commands/test-run';
 import { watchCommand } from './commands/watch';
 import { syncPromptsCommand } from './commands/sync-prompts';
+import { searchCommand, installCommand, publishCommand } from './commands/registry';
 
 const program = new Command();
 
@@ -154,6 +155,47 @@ program
   .argument('<component>', 'Path to component YAML file')
   .action(async (componentPath: string) => {
     await syncPromptsCommand(componentPath, {
+      dryRun: program.opts().dryRun,
+      verbose: program.opts().verbose,
+    });
+  });
+
+// ─────────────────────────────────────────────────────────────
+// Registry Commands (P5-2: component marketplace)
+// ─────────────────────────────────────────────────────────────
+
+program
+  .command('search')
+  .description('Search the component registry')
+  .argument('<query>', 'Search query (name, tag, or keyword)')
+  .option('-r, --registry <url>', 'Custom registry index URL')
+  .action(async (query: string, options: { registry?: string }) => {
+    await searchCommand(query, {
+      registryUrl: options.registry,
+      verbose: program.opts().verbose,
+    });
+  });
+
+program
+  .command('install')
+  .description('Install a component from the registry')
+  .argument('<name[@version]>', 'Component name and optional version (e.g. wechat-publisher@1.0.0)')
+  .option('-r, --registry <url>', 'Custom registry index URL')
+  .action(async (nameVersion: string, options: { registry?: string }) => {
+    await installCommand(nameVersion, {
+      registryUrl: options.registry,
+      verbose: program.opts().verbose,
+    });
+  });
+
+program
+  .command('publish')
+  .description('Publish a component to the registry (runs quality gate first)')
+  .argument('<path>', 'Path to component directory or component.yml file')
+  .option('-r, --registry <url>', 'Custom registry index URL')
+  .action(async (componentPath: string, options: { registry?: string }) => {
+    await publishCommand(componentPath, {
+      registryUrl: options.registry,
       dryRun: program.opts().dryRun,
       verbose: program.opts().verbose,
     });

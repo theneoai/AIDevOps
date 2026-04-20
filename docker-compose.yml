@@ -19,6 +19,10 @@ secrets:
     file: ./secrets/wechat_app_secret.txt
   dify_db_password:
     file: ./secrets/dify_db_password.txt
+  feishu_app_secret:
+    file: ./secrets/feishu_app_secret.txt
+  dingtalk_app_secret:
+    file: ./secrets/dingtalk_app_secret.txt
 
 services:
   # ─── 企业自研: 通用 Tool 服务 ───
@@ -63,6 +67,58 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ─── 企业自研: 飞书 MCP ───
+  mcp-feishu:
+    build:
+      context: ./enterprise/mcp-servers/mcp-feishu
+    container_name: mcp-feishu
+    ports:
+      - "3003:3003"
+    secrets:
+      - feishu_app_secret
+    environment:
+      - PORT=3003
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    profiles:
+      - feishu
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ─── 企业自研: 钉钉 MCP ───
+  mcp-dingtalk:
+    build:
+      context: ./enterprise/mcp-servers/mcp-dingtalk
+    container_name: mcp-dingtalk
+    ports:
+      - "3004:3004"
+    secrets:
+      - dingtalk_app_secret
+    environment:
+      - PORT=3004
+      - DINGTALK_APP_KEY=${DINGTALK_APP_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    profiles:
+      - dingtalk
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3004/health"]
       interval: 30s
       timeout: 10s
       retries: 3

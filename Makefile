@@ -191,3 +191,37 @@ devkit-watch:
 devkit-sync-prompts:
 	@echo "=== 从 Langfuse 同步 Prompt ==="
 	@cd enterprise/dev-kit && npm run dev -- sync-prompts $(file)
+
+# ─── P5: 生态系统 ───
+devkit-search:
+	@echo "=== 搜索组件注册表 ==="
+	@cd enterprise/dev-kit && npm run dev -- search $(query)
+
+devkit-install:
+	@echo "=== 从注册表安装组件 ==="
+	@cd enterprise/dev-kit && npm run dev -- install $(name)
+
+devkit-publish:
+	@echo "=== 发布组件到注册表 ==="
+	@cd enterprise/dev-kit && npm run dev -- publish $(path)
+
+feishu-up:
+	@echo "=== 启动 Feishu MCP Server ==="
+	@docker compose -f docker-compose.yml up mcp-feishu -d
+	@echo "✓ mcp-feishu running on port 3003"
+
+dingtalk-up:
+	@echo "=== 启动 DingTalk MCP Server ==="
+	@docker compose -f docker-compose.yml up mcp-dingtalk -d
+	@echo "✓ mcp-dingtalk running on port 3004"
+
+mcp-all-up:
+	@echo "=== 启动全部 MCP Servers ==="
+	@docker compose -f docker-compose.yml up mcp-wechat mcp-feishu mcp-dingtalk -d
+	@echo "✓ mcp-wechat:    http://localhost:3001"
+	@echo "✓ mcp-feishu:    http://localhost:3003"
+	@echo "✓ mcp-dingtalk:  http://localhost:3004"
+
+registry-validate:
+	@echo "=== 验证注册表索引 ==="
+	@node -e "const r=require('./registry/index.json'); console.log('Registry v'+r.version+': '+r.components.length+' components'); r.components.forEach(c=>console.log('  '+c.name+'@'+c.version+' ['+c.kind+']'));"
