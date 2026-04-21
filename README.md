@@ -81,7 +81,7 @@ Dify is included as a `git submodule` and is never modified. Enterprise capabili
 
 > Just want to run the enterprise tool stack — no Dify installation required.
 
-**Prerequisites:** Docker & Docker Compose v2 (`docker compose` plugin), Node.js 18+, npm 8+
+**Prerequisites:** Docker & Docker Compose v2 (`docker compose` plugin), Node.js 20+ (18 is minimum, 20 LTS recommended), npm 8+
 
 ### 1. Clone the repository
 
@@ -309,6 +309,8 @@ Install from `vscode-dify-dev/`. Provides:
 
 ## Commands Reference
 
+### Make Commands
+
 | Command | Description |
 |---|---|
 | `make init` | Initialize project (auto-generate secrets, create networks) |
@@ -333,6 +335,25 @@ Install from `vscode-dify-dev/`. Provides:
 | `make mcp-all-up` | Start all MCP servers |
 | `make dev-up` | Start local dev stack with hot-reload |
 
+### DevKit CLI Commands
+
+Run commands via `node enterprise/dev-kit/dist/cli.js <command>` (or `npm run dev -- <command>` during development).
+
+**Global flags:** `-c, --config <path>` · `-v, --verbose` · `--dry-run` · `--tenant <name>`
+
+| Command | Description |
+|---|---|
+| `create tool <name> [-t api\|mcp]` | Scaffold a new Tool component YAML |
+| `deploy <name>` | Compile and register a component with Dify |
+| `validate [name] [--all] [-l 1\|2\|3]` | Validate DSL (1=schema, 2=semantic, 3=registry refs) |
+| `status [--offline]` | Show component sync status; `--offline` skips Dify connection |
+| `test <name> [-i key=val] [--mock-file]` | Dry-run a Workflow/Orchestration with mock responses |
+| `watch [-p glob] [-d ms]` | Hot-deploy components on file change |
+| `sync-prompts <component.yml>` | Pull latest prompt versions from Langfuse into DSL |
+| `search <query>` | Search the component registry |
+| `install <name[@version]>` | Install a component from the registry |
+| `publish <path>` | Publish a component to the registry (quality gate first) |
+
 ---
 
 ## Dify Integration
@@ -345,15 +366,15 @@ Dify 1.0+ uses a plugin system. Build enterprise services as plugins:
 
 ```bash
 # Install Dify Plugin CLI
-brew tap langgenius/dify && brew install dify
+pip install dify-plugin-cli
 
-# Create a Tool plugin pointing to tool-service
-cd enterprise/plugins
-dify plugin init   # Select: Tool type
+# Create a Tool plugin directory (outside this repo)
+mkdir my-enterprise-plugin && cd my-enterprise-plugin
+dify plugin init   # Select: Tool type, point server to http://enterprise-tool-service:3100
 
 # Package and install
-dify plugin package ./your-plugin
-# Upload via: Dify → Plugins → Install
+dify plugin package .
+# Upload via: Dify → Plugins → Install Plugin → Upload .difypkg file
 ```
 
 **Option 2: External API Tool (Simple)**
