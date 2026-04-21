@@ -65,17 +65,17 @@ Artifact on failure: `typecheck-results` (typecheck log)
 
 ### Stage 1b — `dify-compat`: Dify Compatibility Check
 
-**Runs on:** commits containing `[dify-upgrade]` in message, or manual dispatch  
+**Runs on:** commits containing `[dify-upgrade]` in push message or PR title, or manual dispatch  
 **Needs:** `validate`  
 **Timeout:** 10 minutes  
 **Services:** PostgreSQL 15 (in-runner)
 
 | Step | Description |
 |---|---|
-| Verify DIFY_VERSION | Checks `DIFY_VERSION` file matches actual submodule SHA |
-| Contract tests | `npm test -- --testPathPattern=contract` against live Postgres |
+| Verify DIFY_VERSION | Checks `DIFY_VERSION` file matches actual submodule SHA; exits 1 if they differ |
+| Version-bounds + contract tests | `bash scripts/check-dify-compat.sh` — runs version range checks and contract tests against live Postgres |
 
-**How to trigger:** include `[dify-upgrade]` in your commit message when updating the Dify submodule.
+**How to trigger:** include `[dify-upgrade]` in your commit message (push) or PR title when updating the Dify submodule.
 
 ---
 
@@ -272,14 +272,16 @@ Configure these in **Settings → Secrets and variables → Actions**:
 
 ## Trigger Conditions
 
-| Event | validate | test-unit | security | build | deploy-staging | deploy-production |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| PR → main | ✓ | ✓ | ✓ | — | — | — |
-| push → main | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| push → claude/\*\* | ✓ | ✓ | ✓ | ✓ | — | — |
-| manual (staging) | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| manual (production) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| manual + skip_tests | ✓ | — | ✓ | ✓ | ✓ | — |
+| Event | validate | dify-compat | test-unit | security | build | deploy-staging | deploy-production |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| PR → main | ✓ | — | ✓ | ✓ | — | — | — |
+| PR → main + `[dify-upgrade]` | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| push → main | ✓ | — | ✓ | ✓ | ✓ | ✓ | — |
+| push → main + `[dify-upgrade]` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| push → claude/\*\* | ✓ | — | ✓ | ✓ | ✓ | — | — |
+| manual (staging) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| manual (production) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| manual + skip_tests | ✓ | ✓ | — | ✓ | ✓ | ✓ | — |
 
 ---
 
