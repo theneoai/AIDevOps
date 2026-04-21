@@ -1,0 +1,143 @@
+# ============================================================
+# LiteLLM Proxy — Enterprise LLM Gateway
+#
+# Purpose:
+#   Acts as a unified LLM endpoint for Dify and enterprise services.
+#   All model calls are routed through this proxy, enabling:
+#     • Load balancing across multiple API keys / providers
+#     • Automatic retry + fallback on rate-limit errors
+#     • Cost attribution per model / team / workspace
+#     • Centralized API key management (Dify never holds keys directly)
+#     • Unified observability (Langfuse, Prometheus)
+#
+# Usage:
+#   Point Dify's model provider URLs to http://llm-gateway:4000/
+#   e.g. OpenAI base_url = http://llm-gateway:4000
+#
+# Reference: https://docs.litellm.ai/docs/proxy/configs
+# ============================================================
+
+model_list:
+  # ── OpenAI — multiple keys for load balancing ──────────────
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY_1
+      rpm: 500
+      tpm: 800000
+    model_info:
+      id: openai-gpt4o-key1
+
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY_2
+      rpm: 500
+      tpm: 800000
+    model_info:
+      id: openai-gpt4o-key2
+
+  # ── Anthropic Claude ───────────────────────────────────────
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 50
+      tpm: 400000
+    model_info:
+      id: anthropic-claude-sonnet46
+
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      api_key: os.environ/ANTHROPIC_API_KEY
+      rpm: 20
+      tpm: 200000
+    model_info:
+      id: anthropic-claude-opus47
+
+  # ── Azure OpenAI (enterprise tenants requiring data residency) ─
+  - model_name: azure-gpt-4o
+    litellm_params:
+      model: azure/gpt-4o
+      api_key: os.environ/AZURE_OPENAI_API_KEY
+      api_base: os.environ/AZURE_OPENAI_ENDPOINT
+      api_version: "2025-01-01-preview"
+      rpm: 300
+    model_info:
+      id: azure-gpt4o
+
+  # ── Local / On-premises (Ollama — air-gapped deployments) ──
+  - model_name: qwen2.5-7b
+    litellm_params:
+      model: ollama/qwen2.5:7b
+      api_base: os.environ/OLLAMA_BASE_URL
+    model_info:
+      id: ollama-qwen25-7b
+
+  - model_name: deepseek-r1-14b
+    litellm_params:
+      model: ollama/deepseek-r1:14b
+      api_base: os.environ/OLLAMA_BASE_URL
+    model_info:
+      id: ollama-deepseek-r1-14b
+
+  # ── Embedding models ───────────────────────────────────────
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY_1
+    model_info:
+      id: openai-embedding-3-small
+
+  - model_name: text-embedding-3-large
+    litellm_params:
+      model: openai/text-embedding-3-large
+      api_key: os.environ/OPENAI_API_KEY_1
+    model_info:
+      id: openai-embedding-3-large
+
+# ── Router strategy ────────────────────────────────────────
+router_settings:
+  # Round-robin across model replicas (same model_name, different keys)
+  routing_strategy: latency-based-routing
+  # Fall back to the next model if one fails with rate-limit or server error
+  allowed_fails: 2
+  cooldown_time: 60  # seconds before a failed key is retried
+  num_retries: 3
+  retry_after: 5
+
+# ── General proxy settings ─────────────────────────────────
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY   # Admin key for /key/generate etc.
+  database_url: os.environ/LITELLM_DATABASE_URL  # PostgreSQL for key management
+
+  # Store spend in DB for cost attribution
+  store_model_in_db: true
+
+  # Langfuse callback for per-call observability
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+
+  langfuse_public_key: os.environ/LANGFUSE_PUBLIC_KEY
+  langfuse_secret_key: os.environ/LANGFUSE_SECRET_KEY
+  langfuse_host: os.environ/LANGFUSE_HOST
+
+  # Prometheus metrics at /metrics
+  set_verbose: false
+
+# ── Workspace-level budget enforcement ─────────────────────
+litellm_settings:
+  # Drop requests (429) instead of letting them fail with provider error
+  drop_params: false
+  # Redact model responses in logs (for PII compliance)
+  redact_messages_in_exceptions: false
+  # Maximum concurrent requests per model
+  max_parallel_requests: 100
+  # Default fallback model if primary is unavailable
+  default_fallbacks: ["claude-sonnet-4-6", "azure-gpt-4o", "qwen2.5-7b"]
+
+# ── Virtual keys configuration ─────────────────────────────
+# Each Dify workspace gets its own virtual key with spending limits.
+# Manage via LiteLLM UI at http://llm-gateway:4000/ui
+# or via API: POST /key/generate {"max_budget": 50, "team_id": "workspace-abc"}

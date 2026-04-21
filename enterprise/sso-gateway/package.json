@@ -1,0 +1,20 @@
+{
+  "name": "enterprise-sso-gateway",
+  "version": "1.0.0",
+  "description": "SSO middleware and nginx configuration for enterprise Dify deployment",
+  "main": "dist/sso-middleware.js",
+  "types": "dist/sso-middleware.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

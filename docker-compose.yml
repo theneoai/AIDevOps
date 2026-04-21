@@ -23,6 +23,116 @@ secrets:
     file: ./secrets/dingtalk_app_secret.txt
 
 services:
+  # ─── 企业自研: 配额管理服务 ───
+  quota-manager:
+    build:
+      context: ./enterprise/quota-manager
+    container_name: quota-manager
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PORT=3006
+      - DIFY_BASE_URL=${DIFY_BASE_URL:-http://nginx/v1}
+      - DIFY_CONSOLE_EMAIL=${DIFY_CONSOLE_EMAIL:-}
+      - DIFY_CONSOLE_PASSWORD=${DIFY_CONSOLE_PASSWORD:-}
+      - QUOTA_DB_HOST=${QUOTA_DB_HOST:-quota-db}
+      - QUOTA_DB_PORT=5432
+      - QUOTA_DB_USER=${QUOTA_DB_USER:-postgres}
+      - QUOTA_DB_PASSWORD=${QUOTA_DB_PASSWORD:-changeme}
+      - QUOTA_DB_NAME=enterprise
+      - POLL_INTERVAL_SECONDS=${QUOTA_POLL_INTERVAL:-300}
+      - JWT_SECRET=${JWT_SECRET:-changeme}
+    networks:
+      - dify-network
+    depends_on:
+      quota-db:
+        condition: service_healthy
+    profiles:
+      - enterprise-plus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  quota-db:
+    image: postgres:16-alpine
+    container_name: quota-db
+    environment:
+      - POSTGRES_DB=enterprise
+      - POSTGRES_USER=${QUOTA_DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${QUOTA_DB_PASSWORD:-changeme}
+    volumes:
+      - quota_db_data:/var/lib/postgresql/data
+    networks:
+      - dify-network
+    profiles:
+      - enterprise-plus
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${QUOTA_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── 企业自研: SCIM 2.0 用户同步适配器 ───
+  scim-adapter:
+    build:
+      context: ./enterprise/scim-adapter
+    container_name: scim-adapter
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PORT=3007
+      - DIFY_BASE_URL=${DIFY_BASE_URL:-http://nginx}
+      - DIFY_CONSOLE_EMAIL=${DIFY_CONSOLE_EMAIL:-}
+      - DIFY_CONSOLE_PASSWORD=${DIFY_CONSOLE_PASSWORD:-}
+      - SCIM_BEARER_TOKEN=${SCIM_BEARER_TOKEN:-changeme}
+      - SCIM_BASE_URL=${SCIM_BASE_URL:-http://localhost:3007}
+    networks:
+      - dify-network
+    profiles:
+      - enterprise-plus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ─── 企业自研: 跨工作区分析聚合服务 ───
+  analytics-service:
+    build:
+      context: ./enterprise/analytics
+    container_name: analytics-service
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PORT=3008
+      - DIFY_BASE_URL=${DIFY_BASE_URL:-http://nginx}
+      - DIFY_CONSOLE_EMAIL=${DIFY_CONSOLE_EMAIL:-}
+      - DIFY_CONSOLE_PASSWORD=${DIFY_CONSOLE_PASSWORD:-}
+      - ANALYTICS_POLL_INTERVAL_MINUTES=${ANALYTICS_POLL_INTERVAL_MINUTES:-15}
+    networks:
+      - dify-network
+    profiles:
+      - enterprise-plus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
   # ─── 企业自研: 通用 Tool 服务 ───
   enterprise-tool-service:
     build:
@@ -175,6 +285,10 @@ services:
     profiles:
       - devkit
     command: ["status"]
+
+volumes:
+  quota_db_data:
+    driver: local
 
 # 统一网络（与 Dify 共享）
 networks:

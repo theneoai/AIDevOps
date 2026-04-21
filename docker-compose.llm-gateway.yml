@@ -1,0 +1,85 @@
+# ============================================================
+# LLM Gateway Stack — Multi-Provider Load Balancing
+#
+# Usage:
+#   make llm-gateway-up
+#   docker compose -f docker-compose.yml -f docker-compose.llm-gateway.yml up llm-gateway -d
+#
+# After startup:
+#   • Admin UI:  http://localhost:4000/ui  (LITELLM_MASTER_KEY)
+#   • API:       http://localhost:4000/v1  (OpenAI-compatible)
+#   • Metrics:   http://localhost:4000/metrics
+#
+# Configure Dify model providers to point to:
+#   OpenAI base_url = http://llm-gateway:4000
+# ============================================================
+
+services:
+  llm-gateway:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: llm-gateway
+    ports:
+      - "4000:4000"
+    command:
+      - "--config=/app/litellm-config.yaml"
+      - "--port=4000"
+      - "--num_workers=4"
+    volumes:
+      - ./enterprise/llm-gateway/config/litellm-config.yaml:/app/litellm-config.yaml:ro
+    environment:
+      # OpenAI API keys (for load balancing — add as many as needed)
+      - OPENAI_API_KEY_1=${OPENAI_API_KEY_1:-}
+      - OPENAI_API_KEY_2=${OPENAI_API_KEY_2:-}
+      # Anthropic
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Azure OpenAI (data residency)
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      # Ollama (local / air-gapped)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      # LiteLLM internal
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-changeme}
+      - LITELLM_DATABASE_URL=postgresql://${LLM_DB_USER:-litellm}:${LLM_DB_PASSWORD:-changeme}@llm-gateway-db:5432/litellm
+      # Langfuse observability
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse-server:3000}
+    networks:
+      - dify-network
+    depends_on:
+      llm-gateway-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  llm-gateway-db:
+    image: postgres:16-alpine
+    container_name: llm-gateway-db
+    environment:
+      - POSTGRES_DB=litellm
+      - POSTGRES_USER=${LLM_DB_USER:-litellm}
+      - POSTGRES_PASSWORD=${LLM_DB_PASSWORD:-changeme}
+    volumes:
+      - llm_gateway_db_data:/var/lib/postgresql/data
+    networks:
+      - dify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LLM_DB_USER:-litellm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  llm_gateway_db_data:
+    driver: local
+
+networks:
+  dify-network:
+    external: true
+    name: dify-network

@@ -1,0 +1,117 @@
+# ============================================================
+# SSO Stack — Enterprise Authentication Layer
+#
+# Usage:
+#   make sso-up                        # Start SSO stack
+#   docker compose -f docker-compose.yml -f docker-compose.sso.yml up -d
+#
+# Services added:
+#   sso-nginx      — Unified reverse proxy with SSO enforcement
+#   oauth2-proxy   — OIDC/OAuth2 token validation
+#   keycloak       — Self-hosted IdP (optional; use if no external IdP)
+#
+# Requires .env variables:
+#   SSO_OIDC_ISSUER_URL, SSO_CLIENT_ID, SSO_CLIENT_SECRET,
+#   SSO_COOKIE_SECRET, SSO_EMAIL_DOMAIN
+# ============================================================
+
+services:
+  # ── nginx SSO Proxy ──────────────────────────────────────
+  sso-nginx:
+    image: nginx:1.27-alpine
+    container_name: sso-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./enterprise/sso-gateway/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Mount TLS certs for production (optional)
+      # - ./certs:/etc/nginx/certs:ro
+    networks:
+      - dify-network
+    depends_on:
+      - oauth2-proxy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── oauth2-proxy (OIDC/OAuth2 token validator) ─────────
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2-proxy
+    command:
+      - "--config=/etc/oauth2-proxy/oauth2-proxy.cfg"
+    volumes:
+      - ./enterprise/sso-gateway/config/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
+    environment:
+      - SSO_OIDC_ISSUER_URL=${SSO_OIDC_ISSUER_URL:-http://keycloak:8080/realms/dify-enterprise}
+      - SSO_CLIENT_ID=${SSO_CLIENT_ID:-dify-enterprise}
+      - SSO_CLIENT_SECRET=${SSO_CLIENT_SECRET:-changeme}
+      - SSO_COOKIE_SECRET=${SSO_COOKIE_SECRET:-changeme-32bytes-exactly-here!!}
+      - SSO_EMAIL_DOMAIN=${SSO_EMAIL_DOMAIN:-*}
+      - SSO_REDIRECT_URL=${SSO_REDIRECT_URL:-http://localhost/oauth2/callback}
+    networks:
+      - dify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4180/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Keycloak (optional self-hosted IdP) ────────────────
+  # Remove this service if you use an external IdP (Okta, Azure AD, etc.)
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-changeme}
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
+      - KC_DB_USERNAME=${KEYCLOAK_DB_USER:-keycloak}
+      - KC_DB_PASSWORD=${KEYCLOAK_DB_PASSWORD:-changeme}
+    volumes:
+      - ./enterprise/sso-gateway/config/keycloak-realm-template.json:/opt/keycloak/data/import/realm.json:ro
+    ports:
+      - "8180:8080"
+    networks:
+      - dify-network
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    profiles:
+      - keycloak
+    restart: unless-stopped
+
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: keycloak-db
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=${KEYCLOAK_DB_USER:-keycloak}
+      - POSTGRES_PASSWORD=${KEYCLOAK_DB_PASSWORD:-changeme}
+    volumes:
+      - keycloak_data:/var/lib/postgresql/data
+    networks:
+      - dify-network
+    profiles:
+      - keycloak
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  keycloak_data:
+    driver: local
+
+networks:
+  dify-network:
+    external: true
+    name: dify-network
