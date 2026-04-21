@@ -3,7 +3,15 @@ import { DifyApiAdapter } from './dify-api-adapter';
 import { DifyDbAdapter } from './dify-db-adapter';
 import { DevKitConfig } from '../core/config';
 
-export { IDifyAdapter, ToolRegistrationResult, ProviderStatus } from './dify-adapter.interface';
+export {
+  IDifyAdapter,
+  ToolRegistrationResult,
+  ProviderStatus,
+  WorkflowRunResult,
+  WorkflowRunOptions,
+  McpServerInfo,
+  PluginInstallResult,
+} from './dify-adapter.interface';
 export { DifyApiAdapter } from './dify-api-adapter';
 export { DifyDbAdapter } from './dify-db-adapter';
 

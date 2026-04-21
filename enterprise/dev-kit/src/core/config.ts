@@ -52,6 +52,18 @@ export interface BackendConfig {
    * 'db' bypasses API validation and breaks on schema upgrades.
    */
   adapter?: 'api' | 'db';
+  /**
+   * Minimum Dify version required by this DevKit configuration.
+   * The compatibility check script uses this to block upgrades that would
+   * drop below the required baseline (semver string, e.g. "1.13.0").
+   */
+  minVersion?: string;
+  /**
+   * Maximum Dify version verified to work with this DevKit configuration.
+   * Versions above this have not been validated by contract tests yet.
+   * Use "x" as a wildcard patch segment, e.g. "1.14.x".
+   */
+  maxVersion?: string;
   /** PostgreSQL connection — used by the deprecated db adapter only */
   db: DatabaseConfig;
 }

@@ -21,6 +21,7 @@ import {
   CodeStepConfig,
   KnowledgeRetrievalStepConfig,
   HITLStepConfig,
+  HumanInputNodeConfig,
   AgentStepConfig,
   ConditionStepConfig,
   IterationStepConfig,
@@ -87,14 +88,16 @@ const STEP_X_STRIDE = NODE_WIDTH + NODE_GAP_X;
 // ─────────────────────────────────────────────────────────────
 
 const KIND_TO_DIFY_TYPE: Record<WorkflowStepKind, string> = {
-  llm:       'llm',
-  tool:      'tool',
-  condition: 'if-else',
-  iteration: 'iteration',
-  code:      'code',
-  knowledge: 'knowledge-retrieval',
-  hitl:      'human-input',
-  agent:     'agent',
+  llm:        'llm',
+  tool:       'tool',
+  condition:  'if-else',
+  iteration:  'iteration',
+  code:       'code',
+  knowledge:  'knowledge-retrieval',
+  hitl:       'human-input',
+  // Dify v1.13 native Human Input node (pause/resume via Celery + Redis Pub/Sub)
+  humanInput: 'human-input',
+  agent:      'agent',
 };
 
 // ─────────────────────────────────────────────────────────────

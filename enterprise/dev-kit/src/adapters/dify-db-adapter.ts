@@ -1,7 +1,15 @@
-import { IDifyAdapter, ToolRegistrationResult, ProviderStatus } from './dify-adapter.interface';
+import {
+  IDifyAdapter,
+  ToolRegistrationResult,
+  ProviderStatus,
+  WorkflowRunResult,
+  WorkflowRunOptions,
+  McpServerInfo,
+  PluginInstallResult,
+} from './dify-adapter.interface';
 import { DifyDbClient } from '../registry/db-client';
 import { DifyDatabaseConfig } from '../core/config';
-import { ToolDSL } from '../types/dsl';
+import { ToolDSL, PluginDSL, McpExportConfig } from '../types/dsl';
 import { compileApiTool, compileMCPTool } from '../core/compiler';
 
 /**
@@ -81,6 +89,34 @@ export class DifyDbAdapter implements IDifyAdapter {
 
   async deleteProvider(_providerId: string): Promise<void> {
     throw new Error('deleteProvider not supported by DifyDbAdapter. Use DifyApiAdapter.');
+  }
+
+  async runWorkflow(_appId: string, _options: WorkflowRunOptions): Promise<WorkflowRunResult> {
+    throw new Error('runWorkflow requires DifyApiAdapter (Dify v1.13+). Migrate from adapter=db.');
+  }
+
+  async stopWorkflowTask(_taskId: string, _userId: string): Promise<void> {
+    throw new Error('stopWorkflowTask requires DifyApiAdapter. Migrate from adapter=db.');
+  }
+
+  async configureMcpExport(_appId: string, _config: McpExportConfig): Promise<McpServerInfo> {
+    throw new Error('configureMcpExport requires DifyApiAdapter (Dify v1.6+). Migrate from adapter=db.');
+  }
+
+  async getMcpServerInfo(_appId: string): Promise<McpServerInfo | null> {
+    throw new Error('getMcpServerInfo requires DifyApiAdapter. Migrate from adapter=db.');
+  }
+
+  async installPlugin(_dsl: PluginDSL): Promise<PluginInstallResult> {
+    throw new Error('installPlugin requires DifyApiAdapter (Dify v1.6+). Migrate from adapter=db.');
+  }
+
+  async listPlugins(): Promise<Array<{ id: string; name: string; version: string }>> {
+    throw new Error('listPlugins requires DifyApiAdapter. Migrate from adapter=db.');
+  }
+
+  async uninstallPlugin(_pluginId: string): Promise<void> {
+    throw new Error('uninstallPlugin requires DifyApiAdapter. Migrate from adapter=db.');
   }
 }
 
