@@ -1,5 +1,6 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { DifyApiAdapter } from '../src/adapters/dify-api-adapter';
+import { DifyApiNotAvailableError, DifyVersionMismatchError } from '../src/adapters/dify-adapter.interface';
 import { ToolDSL } from '../src/types/dsl';
 
 jest.mock('axios');
@@ -149,6 +150,126 @@ describe('DifyApiAdapter', () => {
   describe('disconnect()', () => {
     it('resolves without error (no-op for HTTP client)', async () => {
       await expect(adapter.disconnect()).resolves.toBeUndefined();
+    });
+  });
+
+  // ── Version bounds ────────────────────────────────────────────
+
+  describe('connect() — version bounds', () => {
+    it('succeeds when connected version is within bounds', async () => {
+      const bounded = new DifyApiAdapter('http://localhost/v1', 'key', undefined, {
+        minVersion: '1.13.0',
+        maxVersion: '1.14.x',
+      });
+      // @ts-expect-error accessing private client
+      bounded['client'] = mockClient;
+      mockClient.get.mockResolvedValueOnce({ data: { version: '1.13.3' } });
+      await expect(bounded.connect()).resolves.toBeUndefined();
+    });
+
+    it('throws DifyVersionMismatchError when version is below minVersion', async () => {
+      const bounded = new DifyApiAdapter('http://localhost/v1', 'key', undefined, {
+        minVersion: '1.13.0',
+      });
+      // @ts-expect-error accessing private client
+      bounded['client'] = mockClient;
+      mockClient.get.mockResolvedValueOnce({ data: { version: '1.12.5' } });
+      await expect(bounded.connect()).rejects.toThrow(DifyVersionMismatchError);
+    });
+
+    it('throws DifyVersionMismatchError when version exceeds maxVersion', async () => {
+      const bounded = new DifyApiAdapter('http://localhost/v1', 'key', undefined, {
+        maxVersion: '1.14.x',
+      });
+      // @ts-expect-error accessing private client
+      bounded['client'] = mockClient;
+      mockClient.get.mockResolvedValueOnce({ data: { version: '1.15.0' } });
+      await expect(bounded.connect()).rejects.toThrow(DifyVersionMismatchError);
+    });
+  });
+
+  // ── runWorkflow ────────────────────────────────────────────────
+
+  describe('runWorkflow()', () => {
+    it('uses the adapter api key by default (no Authorization override)', async () => {
+      mockClient.post.mockResolvedValueOnce({
+        status: 200,
+        data: { task_id: 't1', workflow_run_id: 'wr1', data: { status: 'succeeded', outputs: {} } },
+      });
+      await adapter.runWorkflow({ inputs: { q: 'test' }, userId: 'user1' });
+      // Should NOT pass a per-request Authorization header override
+      const call = mockClient.post.mock.calls[0];
+      expect(call[2]).toBeUndefined();
+    });
+
+    it('overrides Authorization when appApiKey is provided', async () => {
+      mockClient.post.mockResolvedValueOnce({
+        status: 200,
+        data: { task_id: 't2', workflow_run_id: 'wr2', data: { status: 'running' } },
+      });
+      await adapter.runWorkflow({
+        inputs: {},
+        userId: 'user1',
+        appApiKey: 'app-specific-key-xyz',
+      });
+      const call = mockClient.post.mock.calls[0];
+      expect(call[2]).toMatchObject({ headers: { Authorization: 'Bearer app-specific-key-xyz' } });
+    });
+
+    it('maps response fields correctly', async () => {
+      mockClient.post.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          task_id: 'task-abc',
+          workflow_run_id: 'run-def',
+          data: { status: 'succeeded', outputs: { result: 'hello' } },
+        },
+      });
+      const result = await adapter.runWorkflow({ inputs: {}, userId: 'u' });
+      expect(result).toMatchObject({
+        taskId: 'task-abc',
+        workflowRunId: 'run-def',
+        status: 'succeeded',
+        outputs: { result: 'hello' },
+      });
+    });
+  });
+
+  // ── Experimental methods ──────────────────────────────────────
+
+  describe('configureMcpExport() — @experimental', () => {
+    it('throws DifyApiNotAvailableError when Dify returns 404', async () => {
+      const notFound = new AxiosError('Not Found');
+      Object.assign(notFound, { response: { status: 404 } });
+      mockClient.post.mockRejectedValueOnce(notFound);
+      await expect(
+        adapter.configureMcpExport('app-id', { enabled: true }),
+      ).rejects.toThrow(DifyApiNotAvailableError);
+    });
+  });
+
+  describe('installPlugin() — @experimental', () => {
+    it('throws DifyApiNotAvailableError when Dify returns 404', async () => {
+      const notFound = new AxiosError('Not Found');
+      Object.assign(notFound, { response: { status: 404 } });
+      mockClient.post.mockRejectedValueOnce(notFound);
+      const dsl = {
+        apiVersion: 'dify.enterprise/v1',
+        kind: 'Plugin' as const,
+        metadata: { name: 'test-plugin' },
+        spec: { source: 'marketplace' as const, pluginId: 'vendor/plugin', version: '1.0.0' },
+      };
+      await expect(adapter.installPlugin(dsl)).rejects.toThrow(DifyApiNotAvailableError);
+    });
+  });
+
+  describe('getMcpServerInfo() — @experimental', () => {
+    it('returns null when Dify returns 404 (graceful degradation)', async () => {
+      const notFound = new AxiosError('Not Found');
+      Object.assign(notFound, { response: { status: 404 } });
+      mockClient.get.mockRejectedValueOnce(notFound);
+      const result = await adapter.getMcpServerInfo('app-id');
+      expect(result).toBeNull();
     });
   });
 });

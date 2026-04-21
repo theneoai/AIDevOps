@@ -91,7 +91,7 @@ export class DifyDbAdapter implements IDifyAdapter {
     throw new Error('deleteProvider not supported by DifyDbAdapter. Use DifyApiAdapter.');
   }
 
-  async runWorkflow(_appId: string, _options: WorkflowRunOptions): Promise<WorkflowRunResult> {
+  async runWorkflow(_options: WorkflowRunOptions): Promise<WorkflowRunResult> {
     throw new Error('runWorkflow requires DifyApiAdapter (Dify v1.13+). Migrate from adapter=db.');
   }
 
