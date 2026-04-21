@@ -25,6 +25,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { randomUUID } from 'crypto';
 import { createLogger } from './observability';
 
 const log = createLogger('hitl');
@@ -217,7 +218,7 @@ export class HITLEngine extends EventEmitter {
     request: Omit<ApprovalRequest, 'id' | 'createdAt' | 'expiresAt'>,
     timeoutSeconds?: number
   ): Promise<ApprovalResult> {
-    const id = `hitl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const id = `hitl_${randomUUID()}`;
     const timeoutSecs = timeoutSeconds ?? this.options.defaultTimeoutSeconds;
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + timeoutSecs * 1000);
@@ -321,17 +322,19 @@ export class HITLEngine extends EventEmitter {
         await sendConsoleNotification(payload);
         break;
 
-      case 'slack':
+      case 'slack': {
         const slackUrl = (request.channelConfig?.slack_channel as string) || this.options.slackWebhookUrl;
         if (!slackUrl) throw new Error('Slack webhook URL not configured');
         await sendSlackNotification(payload, slackUrl);
         break;
+      }
 
-      case 'webhook':
+      case 'webhook': {
         const webhookUrl = (request.channelConfig?.webhook_url as string);
         if (!webhookUrl) throw new Error('Webhook URL not provided in step config');
         await sendWebhookNotification(payload, webhookUrl);
         break;
+      }
 
       case 'email':
         // Email requires SMTP — log placeholder for now
@@ -358,14 +361,31 @@ export class HITLEngine extends EventEmitter {
  * POST /hitl/reject/:requestId   → resolves with 'rejected'
  * GET  /hitl/pending             → lists pending requests
  */
+type RouteHandler = (req: HITLRouteRequest, res: HITLRouteResponse) => void;
+
+interface HITLRouteRequest {
+  params: Record<string, string>;
+  body: { decidedBy?: string; comment?: string } | undefined;
+}
+
+interface HITLRouteResponse {
+  json: (body: unknown) => HITLRouteResponse;
+  status: (code: number) => HITLRouteResponse;
+}
+
+interface HITLApp {
+  post: (path: string, handler: RouteHandler) => void;
+  get: (path: string, handler: (req: unknown, res: HITLRouteResponse) => void) => void;
+}
+
 export function attachHITLRoutes(
-  app: { post: Function; get: Function },
+  app: HITLApp,
   engine: HITLEngine,
   basePath = '/hitl'
 ): void {
-  app.post(`${basePath}/approve/:requestId`, (req: Record<string, unknown>, res: { json: Function; status: Function }) => {
-    const { requestId } = req.params as { requestId: string };
-    const body = req.body as { decidedBy?: string; comment?: string } | undefined;
+  app.post(`${basePath}/approve/:requestId`, (req, res) => {
+    const { requestId } = req.params;
+    const body = req.body;
     const success = engine.resolveApproval(requestId, 'approved', body?.decidedBy, body?.comment);
     if (success) {
       res.json({ status: 'approved', requestId });
@@ -374,9 +394,9 @@ export function attachHITLRoutes(
     }
   });
 
-  app.post(`${basePath}/reject/:requestId`, (req: Record<string, unknown>, res: { json: Function; status: Function }) => {
-    const { requestId } = req.params as { requestId: string };
-    const body = req.body as { decidedBy?: string; comment?: string } | undefined;
+  app.post(`${basePath}/reject/:requestId`, (req, res) => {
+    const { requestId } = req.params;
+    const body = req.body;
     const success = engine.resolveApproval(requestId, 'rejected', body?.decidedBy, body?.comment);
     if (success) {
       res.json({ status: 'rejected', requestId });
@@ -385,7 +405,7 @@ export function attachHITLRoutes(
     }
   });
 
-  app.get(`${basePath}/pending`, (_req: unknown, res: { json: Function }) => {
+  app.get(`${basePath}/pending`, (_req, res) => {
     res.json({ pending: engine.listPending() });
   });
 }

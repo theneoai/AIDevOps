@@ -33,5 +33,5 @@ dify:
     password: "${DIFY_DB_PASSWORD:-difyai123456}"
     database: "${DIFY_DB_NAME:-dify}"
 
-# Local component directory (relative to this file or project root)
-componentsDir: "./enterprise/components"
+# Local component directory (relative to this config file)
+componentsDir: "../components"

@@ -19,9 +19,8 @@ const router = Router();
  *   - summary_length: number - 摘要长度
  */
 router.post('/tools/summarize', requireRole('developer'), promptGuard, async (req, res) => {
-  const rawText: string = req.body.text;
+  const rawText: unknown = req.body.text;
   const max_length = req.body.max_length ?? 100;
-  const text = await anonymizeText(rawText);
 
   if (!rawText || typeof rawText !== 'string') {
     res.status(400).json({
@@ -30,6 +29,8 @@ router.post('/tools/summarize', requireRole('developer'), promptGuard, async (re
     });
     return;
   }
+
+  const text = await anonymizeText(rawText);
 
   // 简单的摘要逻辑（实际项目中可以调用 LLM）
   const sentences = text.split(/[。！？.!?]/).filter(s => s.trim());
@@ -58,9 +59,8 @@ router.post('/tools/summarize', requireRole('developer'), promptGuard, async (re
  *   - keywords: string[] - 提取的关键词列表
  */
 router.post('/tools/extract-keywords', requireRole('developer'), promptGuard, async (req, res) => {
-  const rawText: string = req.body.text;
+  const rawText: unknown = req.body.text;
   const count = req.body.count ?? 5;
-  const text = await anonymizeText(rawText);
 
   if (!rawText || typeof rawText !== 'string') {
     res.status(400).json({
@@ -69,6 +69,8 @@ router.post('/tools/extract-keywords', requireRole('developer'), promptGuard, as
     });
     return;
   }
+
+  const text = await anonymizeText(rawText);
 
   // 简单的关键词提取（实际项目中可以使用 NLP 库）
   const words = text.split(/\s+/);

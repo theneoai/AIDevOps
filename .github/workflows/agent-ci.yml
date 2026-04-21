@@ -108,7 +108,7 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_PASSWORD: difyai123456
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-test-password' }}
           POSTGRES_DB: dify
         options: >-
           --health-cmd pg_isready
@@ -151,7 +151,7 @@ jobs:
           DIFY_DB_HOST: localhost
           DIFY_DB_PORT: '5432'
           DIFY_DB_USER: postgres
-          DIFY_DB_PASSWORD: difyai123456
+          DIFY_DB_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ci-only-test-password' }}
           DIFY_DB_NAME: dify
 
 # ─────────────────────────────────────────────────────────────
@@ -236,12 +236,12 @@ jobs:
         continue-on-error: true
 
       - name: Secret scanning
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.88.1
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: --only-verified
         continue-on-error: true
 
       - name: SAST with CodeQL

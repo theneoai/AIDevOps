@@ -218,8 +218,8 @@ USE_LOCAL_LLM=true make devkit-test
 **所需密钥：**
 | 密钥 | 用途 |
 |---|---|
-| `PROD_DB_HOST` | 生产数据库主机 |
-| `PROD_DB_PASSWORD` | 生产数据库密码 |
+| `PROD_DIFY_BASE_URL` | 生产环境 Dify API 端点 |
+| `PROD_DIFY_API_KEY` | 生产环境 Dify API 密钥 |
 | `SLACK_WEBHOOK_URL` | Slack Incoming Webhook（可选） |
 
 > **HITL 门控：** `production` GitHub 环境必须配置必要审批者。流水线在执行部署步骤前会暂停等待人工审批。
@@ -255,8 +255,9 @@ deploy_env=staging, skip_tests=true
 |---|---|---|
 | `STAGING_DIFY_BASE_URL` | deploy-staging | 示例：`https://staging.dify.internal` |
 | `STAGING_DIFY_API_KEY` | deploy-staging | Dify 控制台 API 密钥（测试环境） |
-| `PROD_DB_HOST` | deploy-production | PostgreSQL 主机地址 |
-| `PROD_DB_PASSWORD` | deploy-production | PostgreSQL 密码 |
+| `PROD_DIFY_BASE_URL` | deploy-production | 示例：`https://dify.internal` |
+| `PROD_DIFY_API_KEY` | deploy-production | Dify 控制台 API 密钥（生产环境） |
+| `CI_POSTGRES_PASSWORD` | dify-compat | 可选 — 未设置时默认使用 `ci-only-test-password` |
 | `ARGOCD_TOKEN` | deploy-staging | 可选 — ArgoCD 认证 Token |
 | `ARGOCD_SERVER` | deploy-staging | 可选 — ArgoCD 服务器地址 |
 | `HARNESS_WEBHOOK_URL` | deploy-staging | 可选 — Harness CD Webhook |

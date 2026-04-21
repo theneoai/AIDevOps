@@ -16,6 +16,13 @@ spec:
         app: tool-service
         app.kubernetes.io/part-of: aidevops
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: tool-service
           image: "{{ .Values.image.registry }}/tool-service:{{ .Values.image.tag }}"
@@ -23,6 +30,11 @@ spec:
           ports:
             - containerPort: {{ .Values.toolService.port }}
               name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             {{- toYaml .Values.toolService.resources | nindent 12 }}
           envFrom:
@@ -40,6 +52,9 @@ spec:
                   name: aidevops-secrets
                   key: langfuse-secret-key
                   optional: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health
@@ -54,3 +69,12 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.toolService.port }}
+            failureThreshold: 12
+            periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}

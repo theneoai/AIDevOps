@@ -11,9 +11,9 @@
 - [项目简介](#项目简介)
 - [架构设计](#架构设计)
 - [核心特性](#核心特性)
-- [快速开始](#快速开始)
+- [用户快速开始](#用户快速开始)
+- [开发者快速开始](#开发者快速开始)
 - [项目结构](#项目结构)
-- [开发指南](#开发指南)
 - [常用命令](#常用命令)
 - [与 Dify 集成](#与-dify-集成)
 - [CI/CD 流水线](#cicd-流水线)
@@ -77,49 +77,50 @@ Dify 以 `git submodule` 方式引入，绝不修改。企业能力在 `/enterpr
 
 ---
 
-## 快速开始
+## 用户快速开始
 
-### 环境准备
+> 只想运行企业工具栈——无需安装 Dify。
 
-- Docker & Docker Compose
-- Node.js 18+（开发时）
-- Make（可选，简化命令操作）
+**环境要求：** Docker & Docker Compose v2（`docker compose` 插件版）、Node.js 18+、npm 8+
 
-### 1. 克隆仓库（含子模块）
+### 1. 克隆仓库
 
 ```bash
-git clone --recursive https://github.com/theneoai/aidevops.git
+git clone https://github.com/theneoai/aidevops.git
 cd aidevops
-
-# 如果已经克隆但未初始化子模块：
-git submodule update --init --recursive
 ```
 
-### 2. 初始化项目
+> 如需完整 Dify 服务栈（`make up-all`）才需要初始化子模块；独立模式无需子模块。
+
+### 2. 初始化（自动生成密钥）
 
 ```bash
 make init
-# 或
-./enterprise/scripts/init.sh
 ```
 
-### 3. 配置环境变量
+此命令将 `.env.example` 复制为 `.env`，并通过 `openssl rand -hex 32` 将所有占位符替换为加密安全随机值。
+
+### 3. 配置
 
 ```bash
-cp .env.example .env
-# 至少需要设置 DIFY_BASE_URL 和 DIFY_API_KEY
+# 编辑 .env — 已生成的密钥值是安全默认值
+# 仅在需要连接已有 Dify 实例时填写：
+#   DIFY_BASE_URL=https://your-dify.example.com
+#   DIFY_API_KEY=your-api-key
 vim .env
 ```
 
-### 4. 构建并启动
+### 4. 启动企业服务（独立模式，无需 Dify）
 
 ```bash
-# 仅启动企业自研服务（不需要 Dify）
-make up
-
-# 启动完整服务栈（Dify + 企业自研）
-make up-all
+make standalone-up
 ```
+
+启动的服务：
+- 企业 Tool Service：http://localhost:3100/health
+- 微信 MCP Server：http://localhost:3001/health
+- 自定义 IM MCP Server：http://localhost:3005/health
+- Ollama（本地 LLM）：http://localhost:11434
 
 ### 5. 健康检查
 
@@ -127,14 +128,129 @@ make up-all
 make health
 ```
 
-### 6. 构建 DevKit CLI
+### 连接已有 Dify 实例
+
+在 `.env` 中设置 `DIFY_BASE_URL` 和 `DIFY_API_KEY`，然后：
 
 ```bash
-make devkit-build
-
-# 校验所有组件
-make devkit-validate
+make up               # 启动企业自研服务
+make devkit-validate  # 对接 Dify 校验所有组件
 ```
+
+### 启动完整服务栈（Dify + 企业自研）
+
+```bash
+git submodule update --init --recursive   # 初始化 Dify 子模块
+make up-all
+```
+
+Dify 控制台：http://localhost/install
+
+---
+
+## 开发者快速开始
+
+> 构建新的 AI 组件（Tool、MCP Server、Workflow）并部署到 Dify。
+
+**额外环境要求：** Python 3 + `pycryptodome`（MCP 凭证加密所需）：
+
+```bash
+pip install pycryptodome
+```
+
+### 1. 先完成上方的用户快速开始
+
+### 2. 安装 DevKit CLI 依赖
+
+```bash
+cd enterprise/dev-kit
+npm install
+npm run build
+cd ../..
+```
+
+### 3. 校验现有组件
+
+```bash
+make devkit-validate
+# 等效命令：node enterprise/dev-kit/dist/cli.js validate --all --level 2 --verbose
+```
+
+### 4. 创建新组件
+
+```bash
+node enterprise/dev-kit/dist/cli.js create tool my-api-tool
+```
+
+编辑生成的 `enterprise/components/my-api-tool.yml`：
+
+```yaml
+apiVersion: v1
+kind: Tool
+metadata:
+  name: my-api-tool
+  version: "1.0.0"
+  labels: [api]
+spec:
+  type: api
+  server: http://tool-service:3100
+  authentication:
+    type: api_key
+    keyName: X-API-Key
+    keyLocation: header
+  endpoints:
+    - path: /v1/my-endpoint
+      method: GET
+      operationId: myEndpoint
+      inputs:
+        - name: query
+          type: string
+          required: true
+          description: "查询参数"
+```
+
+### 5. 校验并部署
+
+```bash
+# 校验 DSL
+node enterprise/dev-kit/dist/cli.js validate enterprise/components/my-api-tool.yml
+
+# 部署到 Dify（需要 .env 中的 DIFY_BASE_URL + DIFY_API_KEY）
+make devkit-deploy name=my-api-tool
+```
+
+### 6. 新增 MCP Server
+
+```bash
+cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-myservice
+
+# 在 src/index.ts 中实现工具逻辑
+# 在 src/config.ts 中通过 readSecret() 管理凭证
+# 确保 /health 和 /metrics 端点存在
+# 在 docker-compose.yml 中添加服务配置
+# 在 registry/index.json 中注册组件规范
+```
+
+### 7. 运行测试
+
+```bash
+# 单元测试
+make devkit-test
+
+# 类型检查
+cd enterprise/dev-kit && npm run typecheck
+
+# 使用本地 Ollama（避免 LLM API 费用）
+USE_LOCAL_LLM=true make devkit-test
+```
+
+### VSCode 扩展
+
+从 `vscode-dify-dev/` 安装。功能包括：
+- `dify-dsl` 文件 YAML 语法高亮
+- 保存时自动进行 Schema 校验
+- `Cmd+Shift+D` — 部署组件到 Dify
+- 命令面板：`Dify: Validate`、`Dify: Watch`
 
 ---
 
@@ -192,98 +308,18 @@ make devkit-validate
 
 ---
 
-## 开发指南
-
-### 新增 MCP Server
-
-```bash
-# 1. 复制脚手架模板
-cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-yourservice
-
-# 2. 在 src/index.ts 中实现工具逻辑
-# 3. 在 src/config.ts 中通过 readSecret() 管理凭证
-# 4. 确保 /health 和 /metrics 端点存在
-# 5. 在 docker-compose.yml 中添加服务配置
-# 6. 在 registry/index.json 中注册组件规范
-```
-
-### 新增 Tool（REST）
-
-在 `enterprise/tool-service/src/routes/` 下参照 `tools.ts` 的模式添加新路由文件。
-
-### 新增 CLI 命令
-
-```bash
-# 1. 创建 enterprise/dev-kit/src/commands/<name>.ts
-# 2. 导出 async function <name>Command(...)
-# 3. 在 enterprise/dev-kit/src/cli.ts 中注册命令
-# 4. 在 enterprise/dev-kit/tests/ 中添加测试
-```
-
-### 组件 DSL
-
-组件以 YAML 方式声明。完整 DSL 参考见 [DevKit README](enterprise/dev-kit/README.md)。
-
-```yaml
-apiVersion: v1
-kind: Tool
-metadata:
-  name: weather-api
-  version: "1.0.0"
-  labels: [api, weather]
-spec:
-  type: api
-  server: http://tool-service:3100
-  authentication:
-    type: api_key
-    keyName: X-API-Key
-    keyLocation: header
-  endpoints:
-    - path: /v1/weather
-      method: GET
-      operationId: getWeather
-      inputs:
-        - name: city
-          type: string
-          required: true
-          description: "城市名称"
-```
-
-### 运行测试
-
-```bash
-# DevKit 单元测试
-make devkit-test
-
-# 使用本地 Ollama（避免 LLM API 费用）
-USE_LOCAL_LLM=true make devkit-test
-
-# 类型检查
-cd enterprise/dev-kit && npm run typecheck
-```
-
-### VSCode 扩展
-
-从 `vscode-dify-dev/` 安装。功能包括：
-- `dify-dsl` 文件 YAML 语法高亮
-- 保存时自动进行 Schema 校验
-- `Cmd+Shift+D` — 部署组件到 Dify
-- 命令面板：`Dify: Validate`、`Dify: Watch`
-
----
-
 ## 常用命令
 
 | 命令 | 说明 |
 |---|---|
-| `make init` | 初始化项目（密钥、子模块） |
-| `make build` | 构建企业自研服务 |
-| `make up` | 启动企业自研服务 |
+| `make init` | 初始化项目（自动生成密钥、创建网络） |
+| `make standalone-up` | 启动企业自研服务（无需 Dify） |
+| `make up` | 启动企业自研服务（需要 Dify） |
 | `make down` | 停止企业自研服务 |
-| `make dify-up` | 启动 Dify 服务 |
-| `make dify-down` | 停止 Dify 服务 |
 | `make up-all` | 启动全部服务（Dify + 企业自研） |
 | `make down-all` | 停止全部服务 |
+| `make dify-up` | 启动 Dify 服务 |
+| `make dify-down` | 停止 Dify 服务 |
 | `make logs` | 查看企业自研服务日志 |
 | `make status` | 查看服务容器状态 |
 | `make health` | 运行健康检查 |
@@ -291,9 +327,12 @@ cd enterprise/dev-kit && npm run typecheck
 | `make clean` | 清理容器和镜像 |
 | `make devkit-build` | 构建 DevKit CLI |
 | `make devkit-test` | 运行 DevKit 单元测试 |
-| `make devkit-validate` | 校验所有组件 |
-| `make observability-up` | 启动监控服务栈 |
-| `make security-up` | 启动 PII 检测服务栈 |
+| `make devkit-validate` | 校验所有组件（构建后校验） |
+| `make devkit-status` | 查看组件状态（离线，无需 Dify） |
+| `make observability-up` | 启动监控服务栈（Langfuse + Prometheus + Grafana） |
+| `make security-up` | 启动 PII 检测服务栈（Presidio） |
+| `make mcp-all-up` | 启动全部 MCP Servers |
+| `make dev-up` | 启动本地开发栈（热重载） |
 
 ---
 
@@ -334,8 +373,8 @@ dify plugin package ./your-plugin
 | 企业 Tool Service | http://localhost:3100 |
 | 微信 MCP | http://localhost:3001/sse |
 | 飞书 MCP | http://localhost:3003/sse |
-| 钉钉 MCP | http://localhost:3005/sse |
-| 自定义 IM MCP | http://localhost:3004/sse |
+| 钉钉 MCP | http://localhost:3004/sse |
+| 自定义 IM MCP | http://localhost:3005/sse |
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 |
 

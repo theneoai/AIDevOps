@@ -11,9 +11,9 @@ Enterprise-grade Agent application framework built on top of open-source [Dify](
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Features](#features)
-- [Quick Start](#quick-start)
+- [User Quickstart](#user-quickstart)
+- [Developer Quickstart](#developer-quickstart)
 - [Project Structure](#project-structure)
-- [Development Guide](#development-guide)
 - [Commands Reference](#commands-reference)
 - [Dify Integration](#dify-integration)
 - [CI/CD Pipeline](#cicd-pipeline)
@@ -77,49 +77,50 @@ Dify is included as a `git submodule` and is never modified. Enterprise capabili
 
 ---
 
-## Quick Start
+## User Quickstart
 
-### Prerequisites
+> Just want to run the enterprise tool stack — no Dify installation required.
 
-- Docker & Docker Compose
-- Node.js 18+ (for development)
-- Make (optional, simplifies commands)
+**Prerequisites:** Docker & Docker Compose v2 (`docker compose` plugin), Node.js 18+, npm 8+
 
-### 1. Clone with submodules
+### 1. Clone the repository
 
 ```bash
-git clone --recursive https://github.com/theneoai/aidevops.git
+git clone https://github.com/theneoai/aidevops.git
 cd aidevops
-
-# If already cloned without submodules:
-git submodule update --init --recursive
 ```
 
-### 2. Initialize
+> Dify submodule is only needed if you want the full Dify stack (`make up-all`). For standalone mode, a shallow clone is sufficient.
+
+### 2. Initialize (auto-generates secrets)
 
 ```bash
 make init
-# or
-./enterprise/scripts/init.sh
 ```
 
-### 3. Configure environment
+This copies `.env.example` → `.env` and replaces all placeholder values with cryptographically random secrets via `openssl rand -hex 32`.
+
+### 3. Configure
 
 ```bash
-cp .env.example .env
-# Edit .env — at minimum set DIFY_BASE_URL and DIFY_API_KEY
+# Edit .env — the generated secrets are safe defaults.
+# Only required if connecting to an existing Dify instance:
+#   DIFY_BASE_URL=https://your-dify.example.com
+#   DIFY_API_KEY=your-api-key
 vim .env
 ```
 
-### 4. Build and start
+### 4. Start enterprise services (standalone, no Dify)
 
 ```bash
-# Enterprise services only (no Dify)
-make up
-
-# Enterprise + Dify (full stack)
-make up-all
+make standalone-up
 ```
+
+Services started:
+- Enterprise Tool Service: http://localhost:3100/health
+- WeChat MCP Server: http://localhost:3001/health
+- Custom IM MCP Server: http://localhost:3005/health
+- Ollama (local LLM): http://localhost:11434
 
 ### 5. Verify health
 
@@ -127,14 +128,128 @@ make up-all
 make health
 ```
 
-### 6. Build DevKit CLI
+### Connect to an existing Dify instance
+
+If you have Dify running elsewhere, set `DIFY_BASE_URL` and `DIFY_API_KEY` in `.env`, then:
 
 ```bash
-make devkit-build
-
-# Validate all components
-make devkit-validate
+make up        # start enterprise services
+make devkit-validate  # validate all components against Dify
 ```
+
+### Start the full stack (Dify + enterprise services)
+
+```bash
+git submodule update --init --recursive   # init Dify submodule
+make up-all
+```
+
+Dify Console: http://localhost/install
+
+---
+
+## Developer Quickstart
+
+> Build new AI components (Tools, MCP Servers, Workflows) and deploy them to Dify.
+
+**Additional prerequisites:** Python 3 + `pycryptodome` (for MCP credential encryption):
+
+```bash
+pip install pycryptodome
+```
+
+### 1. Complete the User Quickstart above first
+
+### 2. Install DevKit CLI dependencies
+
+```bash
+cd enterprise/dev-kit
+npm install
+npm run build
+cd ../..
+```
+
+### 3. Validate existing components
+
+```bash
+make devkit-validate
+# equivalent: node enterprise/dev-kit/dist/cli.js validate --all --level 2 --verbose
+```
+
+### 4. Create a new component
+
+```bash
+node enterprise/dev-kit/dist/cli.js create tool my-api-tool
+```
+
+Edit the generated YAML in `enterprise/components/my-api-tool.yml`:
+
+```yaml
+apiVersion: v1
+kind: Tool
+metadata:
+  name: my-api-tool
+  version: "1.0.0"
+  labels: [api]
+spec:
+  type: api
+  server: http://tool-service:3100
+  authentication:
+    type: api_key
+    keyName: X-API-Key
+    keyLocation: header
+  endpoints:
+    - path: /v1/my-endpoint
+      method: GET
+      operationId: myEndpoint
+      inputs:
+        - name: query
+          type: string
+          required: true
+```
+
+### 5. Validate and deploy
+
+```bash
+# Validate DSL
+node enterprise/dev-kit/dist/cli.js validate enterprise/components/my-api-tool.yml
+
+# Deploy to Dify (requires DIFY_BASE_URL + DIFY_API_KEY in .env)
+make devkit-deploy name=my-api-tool
+```
+
+### 6. Add a new MCP Server
+
+```bash
+cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-myservice
+
+# Implement tools in src/index.ts
+# Add credentials via readSecret() in src/config.ts
+# Ensure /health and /metrics endpoints exist
+# Add the service to docker-compose.yml
+# Register a component spec in registry/index.json
+```
+
+### 7. Run tests
+
+```bash
+# Unit tests
+make devkit-test
+
+# Type checking
+cd enterprise/dev-kit && npm run typecheck
+
+# With local Ollama (avoids LLM API costs)
+USE_LOCAL_LLM=true make devkit-test
+```
+
+### VSCode Extension
+
+Install from `vscode-dify-dev/`. Provides:
+- YAML syntax highlighting for `dify-dsl` files
+- Schema validation on save
+- `Cmd+Shift+D` — deploy component to Dify
+- Command palette: `Dify: Validate`, `Dify: Watch`
 
 ---
 
@@ -192,97 +307,18 @@ make devkit-validate
 
 ---
 
-## Development Guide
-
-### Adding a New MCP Server
-
-```bash
-# 1. Copy the scaffold template
-cp -r enterprise/mcp-servers/mcp-template enterprise/mcp-servers/mcp-yourservice
-
-# 2. Implement tools in src/index.ts
-# 3. Add credentials via readSecret() in src/config.ts
-# 4. Ensure /health and /metrics endpoints are present
-# 5. Add service to docker-compose.yml
-# 6. Register a component spec in registry/index.json
-```
-
-### Adding a New Tool (REST)
-
-Add a route file under `enterprise/tool-service/src/routes/` following the pattern in `tools.ts`.
-
-### Adding a New CLI Command
-
-```bash
-# 1. Create enterprise/dev-kit/src/commands/<name>.ts
-# 2. Export async function <name>Command(...)
-# 3. Register in enterprise/dev-kit/src/cli.ts
-# 4. Add tests in enterprise/dev-kit/tests/
-```
-
-### Component DSL
-
-Define components as YAML. See [DevKit README](enterprise/dev-kit/README.md) for full DSL reference.
-
-```yaml
-apiVersion: v1
-kind: Tool
-metadata:
-  name: weather-api
-  version: "1.0.0"
-  labels: [api, weather]
-spec:
-  type: api
-  server: http://tool-service:3100
-  authentication:
-    type: api_key
-    keyName: X-API-Key
-    keyLocation: header
-  endpoints:
-    - path: /v1/weather
-      method: GET
-      operationId: getWeather
-      inputs:
-        - name: city
-          type: string
-          required: true
-```
-
-### Running Tests
-
-```bash
-# DevKit unit tests
-make devkit-test
-
-# With local Ollama (avoids LLM API costs)
-USE_LOCAL_LLM=true make devkit-test
-
-# Type checking
-cd enterprise/dev-kit && npm run typecheck
-```
-
-### VSCode Extension
-
-Install from `vscode-dify-dev/`. Provides:
-- YAML syntax highlighting for `dify-dsl` files
-- Schema validation on save
-- `Cmd+Shift+D` — deploy component to Dify
-- Command palette: `Dify: Validate`, `Dify: Watch`
-
----
-
 ## Commands Reference
 
 | Command | Description |
 |---|---|
-| `make init` | Initialize project (secrets, submodules) |
-| `make build` | Build enterprise services |
-| `make up` | Start enterprise services |
+| `make init` | Initialize project (auto-generate secrets, create networks) |
+| `make standalone-up` | Start enterprise services without Dify |
+| `make up` | Start enterprise services (requires Dify) |
 | `make down` | Stop enterprise services |
-| `make dify-up` | Start Dify services |
-| `make dify-down` | Stop Dify services |
 | `make up-all` | Start all services (Dify + enterprise) |
 | `make down-all` | Stop all services |
+| `make dify-up` | Start Dify services |
+| `make dify-down` | Stop Dify services |
 | `make logs` | Tail enterprise service logs |
 | `make status` | Show service container status |
 | `make health` | Run health checks |
@@ -290,9 +326,12 @@ Install from `vscode-dify-dev/`. Provides:
 | `make clean` | Remove containers and images |
 | `make devkit-build` | Build DevKit CLI |
 | `make devkit-test` | Run DevKit unit tests |
-| `make devkit-validate` | Validate all components |
-| `make observability-up` | Start monitoring stack |
-| `make security-up` | Start PII detection stack |
+| `make devkit-validate` | Validate all components (builds then validates) |
+| `make devkit-status` | Show component status (offline, no Dify needed) |
+| `make observability-up` | Start monitoring stack (Langfuse + Prometheus + Grafana) |
+| `make security-up` | Start PII detection stack (Presidio) |
+| `make mcp-all-up` | Start all MCP servers |
+| `make dev-up` | Start local dev stack with hot-reload |
 
 ---
 
@@ -333,8 +372,8 @@ dify plugin package ./your-plugin
 | Enterprise Tool Service | http://localhost:3100 |
 | WeChat MCP | http://localhost:3001/sse |
 | Feishu MCP | http://localhost:3003/sse |
-| DingTalk MCP | http://localhost:3005/sse |
-| Custom IM MCP | http://localhost:3004/sse |
+| DingTalk MCP | http://localhost:3004/sse |
+| Custom IM MCP | http://localhost:3005/sse |
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 |
 
