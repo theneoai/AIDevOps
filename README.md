@@ -81,9 +81,13 @@ Dify is included as a `git submodule` and is never modified. Enterprise capabili
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Node.js 18+ (for development)
-- Make (optional, simplifies commands)
+- Docker & Docker Compose v2 (`docker compose` plugin)
+- Node.js 18+ with npm 8+ (for DevKit CLI development)
+- Python 3 + `pycryptodome` — required for MCP Server credential encryption:
+  ```bash
+  pip install pycryptodome
+  ```
+- Make (optional, simplifies commands — all targets also work as raw `docker compose` / `node` commands)
 
 ### 1. Clone with submodules
 

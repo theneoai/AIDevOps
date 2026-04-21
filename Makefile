@@ -1,14 +1,34 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-validate devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets
 
 # ─── 初始化 ───
 init:
 	@test -f .env || cp .env.example .env
+	@echo "=== 自动生成安全随机密钥 ==="
+	@$(MAKE) _gen-secrets
 	@docker network inspect dify-network >/dev/null 2>&1 || docker network create dify-network
+	@echo ""
 	@echo "=== 初始化完成 ==="
 	@echo "下一步:"
-	@echo "  1. 编辑 .env 文件，填写必要的配置"
+	@echo "  1. 编辑 .env 填写业务配置 (DIFY_BASE_URL, WECHAT_APP_ID 等)"
 	@echo "  2a. 有 Dify: make up-all"
 	@echo "  2b. 无 Dify: make standalone-up"
+
+# 内部目标：将 .env 中所有 changeme/REPLACE_WITH 占位符替换为随机值
+_gen-secrets:
+	@if command -v openssl >/dev/null 2>&1; then \
+	  for placeholder in changeme REPLACE_WITH; do \
+	    while grep -q "$$placeholder" .env 2>/dev/null; do \
+	      secret=$$(openssl rand -hex 32); \
+	      pattern=$$(grep -m1 "$$placeholder" .env | head -c120); \
+	      key=$$(echo "$$pattern" | cut -d= -f1); \
+	      sed -i "0,/$$placeholder/s/$$placeholder/$$secret/" .env; \
+	      echo "  [generated] $$key"; \
+	    done; \
+	  done; \
+	  echo "  ✓ 所有弱默认密钥已替换为随机值"; \
+	else \
+	  echo "  ⚠️  openssl not found — please manually replace 'changeme' values in .env"; \
+	fi
 
 # ─── 密钥目录初始化 ───
 init-secrets:
@@ -87,6 +107,12 @@ devkit-test:
 	@echo "=== 运行 DevKit 测试 ==="
 	@cd enterprise/dev-kit && npm test
 	@echo "✓ DevKit 测试完成"
+
+devkit-validate:
+	@echo "=== 验证所有组件 DSL ==="
+	@cd enterprise/dev-kit && npm run build --silent
+	@node enterprise/dev-kit/dist/cli.js validate --all --level 2 --verbose
+	@echo "✓ 所有组件验证通过"
 
 devkit-deploy:
 	@echo "=== 使用 DevKit 部署组件 ==="

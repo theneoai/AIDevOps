@@ -81,9 +81,13 @@ Dify 以 `git submodule` 方式引入，绝不修改。企业能力在 `/enterpr
 
 ### 环境准备
 
-- Docker & Docker Compose
-- Node.js 18+（开发时）
-- Make（可选，简化命令操作）
+- Docker & Docker Compose v2（`docker compose` 插件版）
+- Node.js 18+，npm 8+（DevKit CLI 开发）
+- Python 3 + `pycryptodome`——MCP Server 凭证加密所需：
+  ```bash
+  pip install pycryptodome
+  ```
+- Make（可选，简化命令——所有目标也可直接用 `docker compose` / `node` 命令执行）
 
 ### 1. 克隆仓库（含子模块）
 
