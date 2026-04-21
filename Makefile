@@ -1,4 +1,4 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-validate devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-validate devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets sso-up sso-down sso-keycloak-up llm-gateway-up llm-gateway-down enterprise-plus-up enterprise-plus-down quota-status scim-test analytics-up
 
 # ─── 初始化 ───
 init:
@@ -306,3 +306,97 @@ mcp-all-up:
 registry-validate:
 	@echo "=== 验证注册表索引 ==="
 	@node -e "const r=require('./registry/index.json'); console.log('Registry v'+r.version+': '+r.components.length+' components'); r.components.forEach(c=>console.log('  '+c.name+'@'+c.version+' ['+c.kind+']'));"
+
+# ─── Enterprise Plus: SSO 认证网关 ───────────────────────────
+sso-up:
+	@echo "=== 启动 SSO 认证网关 (nginx + oauth2-proxy) ==="
+	@echo "  需要设置: SSO_OIDC_ISSUER_URL, SSO_CLIENT_ID, SSO_CLIENT_SECRET, SSO_COOKIE_SECRET"
+	@docker compose -f docker-compose.yml -f docker-compose.sso.yml up sso-nginx oauth2-proxy -d
+	@echo "✓ SSO 网关已启动"
+	@echo "  入口:       http://localhost (通过 SSO 保护)"
+	@echo "  OAuth2回调: http://localhost/oauth2/callback"
+	@echo ""
+	@echo "  如使用自托管 Keycloak: make sso-keycloak-up"
+
+sso-keycloak-up:
+	@echo "=== 启动 Keycloak IdP (自托管) ==="
+	@docker compose -f docker-compose.yml -f docker-compose.sso.yml --profile keycloak up keycloak keycloak-db -d
+	@echo "✓ Keycloak 已启动"
+	@echo "  管理控制台: http://localhost:8180/admin (admin/changeme)"
+	@echo "  Realm:      dify-enterprise (从模板自动导入)"
+
+sso-down:
+	@docker compose -f docker-compose.yml -f docker-compose.sso.yml down sso-nginx oauth2-proxy keycloak keycloak-db 2>/dev/null || true
+
+# ─── Enterprise Plus: LLM 网关 ─────────────────────────────
+llm-gateway-up:
+	@echo "=== 启动 LLM 网关 (LiteLLM 多模型负载均衡) ==="
+	@echo "  需要设置: OPENAI_API_KEY_1, ANTHROPIC_API_KEY 等"
+	@docker compose -f docker-compose.yml -f docker-compose.llm-gateway.yml up llm-gateway llm-gateway-db -d
+	@echo "✓ LLM 网关已启动"
+	@echo "  API:    http://localhost:4000/v1  (OpenAI 兼容)"
+	@echo "  Admin:  http://localhost:4000/ui  (LITELLM_MASTER_KEY)"
+	@echo "  Metrics: http://localhost:4000/metrics"
+	@echo ""
+	@echo "  在 Dify 模型配置中将 base_url 设置为 http://llm-gateway:4000"
+
+llm-gateway-down:
+	@docker compose -f docker-compose.yml -f docker-compose.llm-gateway.yml down llm-gateway llm-gateway-db
+
+# ─── Enterprise Plus: 配额/SCIM/Analytics ─────────────────
+enterprise-plus-up:
+	@echo "=== 启动 Enterprise Plus 服务 ==="
+	@echo "  包含: 配额管理 + SCIM适配 + 分析聚合"
+	@docker compose --profile enterprise-plus up quota-manager quota-db scim-adapter analytics-service -d
+	@echo "✓ Enterprise Plus 服务已启动"
+	@echo "  配额管理 API:    http://localhost:3006/quotas"
+	@echo "  SCIM 2.0 端点:  http://localhost:3007/scim/v2"
+	@echo "  分析 Metrics:    http://localhost:3008/metrics"
+
+enterprise-plus-down:
+	@docker compose --profile enterprise-plus down quota-manager quota-db scim-adapter analytics-service
+
+# ─── Enterprise Plus: 运维命令 ────────────────────────────
+quota-status:
+	@echo "=== 当前工作区配额状态 ==="
+	@curl -sf -H "Authorization: Bearer $${JWT_TOKEN}" http://localhost:3006/quotas | \
+	  node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const r=JSON.parse(d); r.data.forEach(ws=>{ console.log(''); console.log('Workspace: '+ws.policy.workspaceId+' ['+ws.status+']'); if(ws.violations.length) ws.violations.forEach(v=>console.log('  EXCEEDED: '+v)); if(ws.warnings.length) ws.warnings.forEach(w=>console.log('  WARNING:  '+w)); if(ws.status==='ok') console.log('  All quotas within limits'); });" 2>/dev/null || \
+	  echo "  未能获取配额状态 — 确认 JWT_TOKEN 已设置且 quota-manager 已启动"
+
+scim-test:
+	@echo "=== 测试 SCIM 2.0 端点 ==="
+	@curl -sf -H "Authorization: Bearer $${SCIM_BEARER_TOKEN}" \
+	  http://localhost:3007/scim/v2/ServiceProviderConfig | python3 -m json.tool
+	@echo ""
+	@echo "=== SCIM Users ==="
+	@curl -sf -H "Authorization: Bearer $${SCIM_BEARER_TOKEN}" \
+	  http://localhost:3007/scim/v2/Users | python3 -m json.tool
+	@echo ""
+	@echo "=== SCIM Groups ==="
+	@curl -sf -H "Authorization: Bearer $${SCIM_BEARER_TOKEN}" \
+	  http://localhost:3007/scim/v2/Groups | python3 -m json.tool
+
+analytics-up:
+	@docker compose --profile enterprise-plus up analytics-service -d
+	@echo "✓ Analytics service started: http://localhost:3008/metrics"
+	@echo "  Grafana仪表盘: 导入 enterprise/analytics/config/grafana-dashboard.json"
+
+# ─── 完整 Enterprise 栈 ────────────────────────────────────
+enterprise-full-up: up observability-up enterprise-plus-up
+	@echo ""
+	@echo "=== 完整 Enterprise 栈已启动 ==="
+	@echo "  企业服务:     http://localhost:3100  (tool-service)"
+	@echo "  配额管理:     http://localhost:3006/quotas"
+	@echo "  SCIM 2.0:    http://localhost:3007/scim/v2"
+	@echo "  分析指标:     http://localhost:3008/metrics"
+	@echo "  Langfuse:     http://localhost:3002"
+	@echo "  Grafana:      http://localhost:3003"
+	@echo "  (SSO): make sso-up"
+	@echo "  (LLM网关): make llm-gateway-up"
+
+enterprise-health:
+	@echo "=== Enterprise 服务健康检查 ==="
+	@for port in 3006 3007 3008; do \
+	  name=$$(case $$port in 3006) echo "quota-manager";; 3007) echo "scim-adapter";; 3008) echo "analytics";; esac); \
+	  curl -sf http://localhost:$$port/health >/dev/null && echo "✓ $$name ($$port) healthy" || echo "✗ $$name ($$port) unhealthy"; \
+	done

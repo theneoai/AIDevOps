@@ -1,0 +1,98 @@
+{
+  "realm": "dify-enterprise",
+  "enabled": true,
+  "displayName": "Dify Enterprise",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "sslRequired": "external",
+  "accessTokenLifespan": 3600,
+  "ssoSessionMaxLifespan": 86400,
+  "roles": {
+    "realm": [
+      { "name": "platform_admin", "description": "Full platform administration access" },
+      { "name": "project_owner", "description": "Workspace owner — manage apps, members, knowledge bases" },
+      { "name": "developer", "description": "Build and deploy workflows and agents" },
+      { "name": "viewer", "description": "Read-only access to published apps" }
+    ]
+  },
+  "groups": [
+    {
+      "name": "platform-admins",
+      "realmRoles": ["platform_admin"]
+    },
+    {
+      "name": "workspace-owners",
+      "realmRoles": ["project_owner"]
+    },
+    {
+      "name": "developers",
+      "realmRoles": ["developer"]
+    },
+    {
+      "name": "viewers",
+      "realmRoles": ["viewer"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "dify-enterprise",
+      "name": "Dify Enterprise Platform",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost/oauth2/callback",
+        "https://${YOUR_DOMAIN}/oauth2/callback"
+      ],
+      "webOrigins": [
+        "http://localhost",
+        "https://${YOUR_DOMAIN}"
+      ],
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "groups-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "multivalued": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA256",
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  }
+}

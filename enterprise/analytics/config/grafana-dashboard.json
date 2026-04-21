@@ -1,0 +1,205 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Enterprise Prometheus instance",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": { "list": [] },
+  "title": "Dify Enterprise Overview",
+  "uid": "dify-enterprise-overview",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "5m",
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Apps",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "dify_app_count",
+        "legendFormat": "Apps"
+      }],
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"green","value":0}] } } }
+    },
+    {
+      "id": 2,
+      "title": "Workspace Members",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "dify_member_count",
+        "legendFormat": "Members"
+      }],
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"blue","value":0}] } } }
+    },
+    {
+      "id": 3,
+      "title": "Knowledge Bases",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "dify_knowledge_base_count",
+        "legendFormat": "KBs"
+      }],
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"purple","value":0}] } } }
+    },
+    {
+      "id": 4,
+      "title": "Quota Status (0=ok, 1=warn, 2=exceeded)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "enterprise_quota_status",
+        "legendFormat": "{{workspace_name}}"
+      }],
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Daily Conversations by App (30 days)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "dify_daily_conversations_total",
+        "legendFormat": "{{app_name}} ({{mode}})"
+      }],
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2 } } }
+    },
+    {
+      "id": 11,
+      "title": "Daily Active Users by App (30 days)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "dify_daily_active_users_total",
+        "legendFormat": "{{app_name}}"
+      }],
+      "options": { "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 20,
+      "title": "Token Consumption by App (30 days)",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "topk(10, dify_daily_tokens_used_total)",
+        "legendFormat": "{{app_name}}"
+      }],
+      "options": { "xField": "Time", "barWidth": 0.8 }
+    },
+    {
+      "id": 21,
+      "title": "Workflow Runs by App (30 days)",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "dify_workflow_run_total",
+        "legendFormat": "{{app_name}}"
+      }]
+    },
+    {
+      "id": 30,
+      "title": "Member Count vs Limit",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 20 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "enterprise_workspace_member_count",
+        "legendFormat": "{{workspace_id}}"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": true },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 31,
+      "title": "Monthly Token Budget",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 20 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "enterprise_workspace_monthly_tokens",
+        "legendFormat": "{{workspace_id}}"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": true },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 40,
+      "title": "LLM Gateway — Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "expr": "rate(litellm_requests_total[5m])",
+        "legendFormat": "{{model}}"
+      }],
+      "description": "Requires LiteLLM Proxy with Prometheus metrics enabled"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "pluginId": "prometheus",
+        "label": "Prometheus",
+        "current": {}
+      }
+    ]
+  }
+}
