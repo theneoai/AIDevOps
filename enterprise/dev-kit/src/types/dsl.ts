@@ -16,6 +16,8 @@ export type ComponentKind =
   | 'Chatflow'
   | 'Chatbot'
   | 'TextGenerator'
+  | 'KnowledgeBase'
+  | 'Plugin'
   | 'KnowledgeRetrieval'
   | 'LLMNode'
   | 'CodeNode'
@@ -34,7 +36,8 @@ export type ComponentKind =
   | 'DocumentExtractorNode'
   | 'KnowledgeRetrievalNode'
   | 'AgentNode'
-  | 'ToolNode';
+  | 'ToolNode'
+  | 'HumanInputNode';
 
 // ─────────────────────────────────────────────────────────────
 // Shared Metadata
@@ -250,7 +253,7 @@ export interface KnowledgeRetrievalStepConfig {
   outputVariable?: string;
 }
 
-/** Human-in-the-Loop approval step */
+/** Human-in-the-Loop approval step (external notification channel) */
 export interface HITLStepConfig {
   /** Notification channel: "slack", "email", "webhook" */
   channel: 'slack' | 'email' | 'webhook';
@@ -267,6 +270,37 @@ export interface HITLStepConfig {
   /** Email recipients for channel === 'email' */
   emailRecipients?: string[];
   /** Output variable name for the approval decision */
+  outputVariable?: string;
+}
+
+/**
+ * Native Dify v1.13 Human Input node.
+ * Pauses workflow execution in the Dify UI, allowing a human operator to
+ * review AI outputs, edit variables, and choose a routing action before
+ * the workflow resumes. Execution state is persisted via Celery + Redis.
+ */
+export interface HumanInputNodeConfig {
+  /**
+   * Custom action buttons presented to the reviewer.
+   * Each action maps to a downstream branch (condition node) by name.
+   * Defaults to ["approve", "reject"] if omitted.
+   */
+  actions?: string[];
+  /**
+   * Variables that the reviewer is allowed to edit in the Dify UI before
+   * resuming. References use the "{{step_id.variable}}" syntax.
+   */
+  editableVars?: WorkflowVarRef[];
+  /** Seconds before the node auto-times-out; 0 means no timeout. */
+  timeoutSeconds?: number;
+  /** Action to take on timeout: default is "reject". */
+  onTimeout?: 'approve' | 'reject' | 'error';
+  /**
+   * Optional instruction text shown in the reviewer UI.
+   * Supports {{var}} interpolation.
+   */
+  instructions?: WorkflowVarRef;
+  /** Output variable that holds the selected action name after resumption. */
   outputVariable?: string;
 }
 
@@ -287,6 +321,7 @@ export type WorkflowStepKind =
   | 'code'
   | 'knowledge'
   | 'hitl'
+  | 'humanInput'
   | 'agent';
 
 export interface WorkflowStep {
@@ -299,7 +334,16 @@ export interface WorkflowStep {
   /** Dependencies (other step ids that must complete first) */
   dependsOn?: string[];
   /** Step-specific configuration */
-  config: LLMStepConfig | ToolStepConfig | ConditionStepConfig | IterationStepConfig | CodeStepConfig | KnowledgeRetrievalStepConfig | HITLStepConfig | AgentStepConfig;
+  config:
+    | LLMStepConfig
+    | ToolStepConfig
+    | ConditionStepConfig
+    | IterationStepConfig
+    | CodeStepConfig
+    | KnowledgeRetrievalStepConfig
+    | HITLStepConfig
+    | HumanInputNodeConfig
+    | AgentStepConfig;
 }
 
 export interface WorkflowSpec {
@@ -379,6 +423,8 @@ export interface AgentSpec {
   suggestedQuestions?: string[];
   /** Max agent iterations before stopping */
   maxIterations?: number;
+  /** Dify v1.6+: expose this Agent as an outbound MCP Server endpoint. */
+  mcpExport?: McpExportConfig;
 }
 
 export interface AgentDSL {
@@ -429,6 +475,26 @@ export interface OrchestrationDSL {
 // Chatflow DSL Types
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * Dify v1.6+ outbound MCP export configuration.
+ * Exposes this App/Agent as a standard MCP Server endpoint so that external
+ * clients (Cursor, Claude Desktop, other Dify instances) can call it as a tool.
+ */
+export interface McpExportConfig {
+  /** Whether to expose this component as an MCP Server. */
+  enabled: boolean;
+  /**
+   * Authentication mode for inbound MCP clients.
+   * - "pre-authorized": clients must supply a pre-generated token.
+   * - "auth-free": no token required (suitable for internal networks only).
+   */
+  authMode?: 'pre-authorized' | 'auth-free';
+  /** Human-readable description shown in the MCP tool manifest. */
+  description?: string;
+  /** Optional path suffix for the MCP endpoint (default: /<app-id>/mcp). */
+  pathSuffix?: string;
+}
+
 export interface ChatflowSpec {
   /** Underlying agent reference */
   agent?: string;
@@ -448,6 +514,8 @@ export interface ChatflowSpec {
   suggestedQuestions?: string[];
   /** Workflow triggered on each user message */
   preprocessWorkflow?: string;
+  /** Dify v1.6+: expose this Chatflow as an outbound MCP Server endpoint. */
+  mcpExport?: McpExportConfig;
 }
 
 export interface ChatflowDSL {
@@ -455,6 +523,115 @@ export interface ChatflowDSL {
   kind: 'Chatflow';
   metadata: DSLMetadata;
   spec: ChatflowSpec;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Knowledge Base DSL Types (Dify v1.12+)
+// ─────────────────────────────────────────────────────────────
+
+export interface KnowledgeBaseRetrievalConfig {
+  /**
+   * Retrieval strategy.
+   * - "vector": pure embedding similarity search.
+   * - "fulltext": keyword-based BM25 search.
+   * - "hybrid": weighted combination of vector + fulltext (recommended).
+   */
+  mode?: 'vector' | 'fulltext' | 'hybrid';
+  /** Dify v1.12: attach a summary to each chunk for better co-retrieval. */
+  summaryIndex?: boolean;
+  /** Multimodal retrieval configuration (Dify v1.12+). */
+  multimodal?: {
+    /** Enable image vectorisation alongside text. */
+    enabled: boolean;
+    /** Embedding model that supports multimodal input. */
+    embeddingModel?: string;
+    /** Automatically extract images referenced in Markdown. */
+    imageExtract?: boolean;
+  };
+  /** Number of chunks to return per query. */
+  topK?: number;
+  /** Minimum similarity score threshold (0–1). */
+  scoreThreshold?: number;
+}
+
+export interface KnowledgeBaseSpec {
+  /** Human-readable description of what this knowledge base contains. */
+  description?: string;
+  retrieval?: KnowledgeBaseRetrievalConfig;
+  /** Embedding model provider (e.g. "openai"). */
+  embeddingProvider?: string;
+  /** Embedding model name (e.g. "text-embedding-3-large"). */
+  embeddingModel?: string;
+  /** Chunking strategy */
+  chunking?: {
+    /** Max characters per chunk. */
+    maxChunkSize?: number;
+    /** Overlap characters between consecutive chunks. */
+    chunkOverlap?: number;
+    /** Separator used to split documents. */
+    separator?: string;
+  };
+}
+
+export interface KnowledgeBaseDSL {
+  apiVersion: string;
+  kind: 'KnowledgeBase';
+  metadata: DSLMetadata;
+  spec: KnowledgeBaseSpec;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Plugin DSL Types (Dify v1.6+ Marketplace)
+// ─────────────────────────────────────────────────────────────
+
+export type PluginSource = 'marketplace' | 'git' | 'local';
+
+export interface PluginSpec {
+  /**
+   * Where the plugin comes from.
+   * - "marketplace": official Dify Marketplace (marketplace.dify.ai).
+   * - "git": install from a GitHub/GitLab repository URL.
+   * - "local": install from a local directory (dev/test only).
+   */
+  source: PluginSource;
+  /**
+   * Marketplace plugin identifier in "<author>/<plugin-name>" format.
+   * Required when source === "marketplace".
+   */
+  pluginId?: string;
+  /**
+   * Git repository URL.
+   * Required when source === "git".
+   */
+  gitUrl?: string;
+  /**
+   * Git ref (branch, tag, or commit SHA) to install from.
+   * Defaults to the repository's default branch.
+   */
+  gitRef?: string;
+  /**
+   * Local filesystem path to the plugin directory.
+   * Required when source === "local".
+   */
+  localPath?: string;
+  /**
+   * Semver range or exact version to install from the marketplace.
+   * Examples: "^1.0.0", "~2.3.1", "1.4.0".
+   * Ignored when source !== "marketplace".
+   */
+  version?: string;
+  /**
+   * Plugin-specific configuration key-value pairs.
+   * Supports ${ENV_VAR} substitution.
+   */
+  config?: Record<string, string>;
+}
+
+export interface PluginDSL {
+  apiVersion: string;
+  kind: 'Plugin';
+  metadata: DSLMetadata;
+  spec: PluginSpec;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -466,4 +643,6 @@ export type ComponentDSL =
   | WorkflowDSL
   | AgentDSL
   | OrchestrationDSL
-  | ChatflowDSL;
+  | ChatflowDSL
+  | KnowledgeBaseDSL
+  | PluginDSL;

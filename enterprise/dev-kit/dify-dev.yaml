@@ -25,6 +25,12 @@ dify:
   apiUrl: "${DIFY_API_URL:-http://localhost/v1}"
   consoleUrl: "${DIFY_CONSOLE_URL:-http://localhost}"
 
+  # Version compatibility bounds (改进3: enforced by check-dify-compat.sh + CI)
+  # minVersion: minimum Dify version required (semver). Requires HITL + Celery engine.
+  # maxVersion: highest version validated by contract tests ("x" = wildcard patch).
+  minVersion: "1.13.0"
+  maxVersion: "1.14.x"
+
   # DB settings (only used when adapter: db — deprecated)
   db:
     host: "${DIFY_DB_HOST:-db_postgres}"

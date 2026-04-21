@@ -3,7 +3,17 @@ import { DifyApiAdapter } from './dify-api-adapter';
 import { DifyDbAdapter } from './dify-db-adapter';
 import { DevKitConfig } from '../core/config';
 
-export { IDifyAdapter, ToolRegistrationResult, ProviderStatus } from './dify-adapter.interface';
+export {
+  IDifyAdapter,
+  ToolRegistrationResult,
+  ProviderStatus,
+  WorkflowRunResult,
+  WorkflowRunOptions,
+  McpServerInfo,
+  PluginInstallResult,
+  DifyApiNotAvailableError,
+  DifyVersionMismatchError,
+} from './dify-adapter.interface';
 export { DifyApiAdapter } from './dify-api-adapter';
 export { DifyDbAdapter } from './dify-db-adapter';
 
@@ -17,7 +27,12 @@ export function createDifyAdapter(config: DevKitConfig): IDifyAdapter {
           'Set dify.adapter=db in dify-dev.yaml to use the legacy DB adapter.'
       );
     }
-    return new DifyApiAdapter(config.dify.baseUrl, config.dify.apiKey);
+    return new DifyApiAdapter(
+      config.dify.baseUrl,
+      config.dify.apiKey,
+      undefined,  // use default DIFY_V1_PATHS
+      { minVersion: config.dify.minVersion, maxVersion: config.dify.maxVersion },
+    );
   }
 
   // @deprecated: DB adapter will be removed in v0.4.0

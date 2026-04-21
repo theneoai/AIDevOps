@@ -96,13 +96,15 @@ jobs:
           path: /tmp/typecheck.log
 
 # ─────────────────────────────────────────────────────────────
-# Stage 1b: Dify Compatibility Check (on Dify upgrade commits)
+# Stage 1b: Dify Compatibility Check
+# Runs on every PR and every push that touches enterprise/ or DIFY_VERSION.
+# Blocks deploy if the submodule SHA differs from DIFY_VERSION or if the
+# declared minVersion/maxVersion bounds are violated (改进3).
 # ─────────────────────────────────────────────────────────────
   dify-compat:
     name: 'Dify Compatibility Check'
     runs-on: ubuntu-latest
     needs: [validate]
-    if: contains(github.event.head_commit.message, '[dify-upgrade]') || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     timeout-minutes: 10
     services:
       postgres:
@@ -134,19 +136,22 @@ jobs:
         working-directory: enterprise/dev-kit
         run: npm ci
 
-      - name: Verify DIFY_VERSION matches submodule
+      - name: Enforce DIFY_VERSION pin and version bounds
         run: |
-          PINNED=$(cat DIFY_VERSION | awk '{print $1}')
-          CURRENT=$(git -C dify rev-parse HEAD)
-          echo "Pinned:  $PINNED"
-          echo "Current: $CURRENT"
+          PINNED=$(awk '{print $1}' DIFY_VERSION)
+          CURRENT=$(git -C dify rev-parse HEAD 2>/dev/null || echo "uninitialized")
+          echo "Pinned SHA : $PINNED"
+          echo "Current SHA: $CURRENT"
           if [ "$PINNED" != "$CURRENT" ]; then
-            echo "::warning::Dify submodule SHA differs from DIFY_VERSION. Running contract tests."
+            echo "::error::Dify submodule SHA ($CURRENT) differs from DIFY_VERSION ($PINNED)."
+            echo "::error::Update DIFY_VERSION or reset the submodule before merging."
+            exit 1
           fi
+          echo "✓ Submodule SHA matches DIFY_VERSION pin."
 
-      - name: Run contract tests
+      - name: Run version-bounds + contract tests
         working-directory: enterprise/dev-kit
-        run: npm test -- --testPathPattern=contract --runInBand --forceExit
+        run: bash scripts/check-dify-compat.sh
         env:
           DIFY_DB_HOST: localhost
           DIFY_DB_PORT: '5432'
