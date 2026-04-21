@@ -223,8 +223,8 @@ Artifact: `integration-test-results`
 **Required secrets:**
 | Secret | Purpose |
 |---|---|
-| `PROD_DB_HOST` | Production database host |
-| `PROD_DB_PASSWORD` | Production database password |
+| `PROD_DIFY_BASE_URL` | Production Dify API endpoint |
+| `PROD_DIFY_API_KEY` | Production Dify API key |
 | `SLACK_WEBHOOK_URL` | Slack incoming webhook (optional) |
 
 > **HITL Gate:** The `production` GitHub environment must have required reviewers configured. The workflow pauses for approval before executing deployment steps.
@@ -260,8 +260,9 @@ Configure these in **Settings → Secrets and variables → Actions**:
 |---|---|---|
 | `STAGING_DIFY_BASE_URL` | deploy-staging | e.g. `https://staging.dify.internal` |
 | `STAGING_DIFY_API_KEY` | deploy-staging | Dify console API key for staging |
-| `PROD_DB_HOST` | deploy-production | PostgreSQL host |
-| `PROD_DB_PASSWORD` | deploy-production | PostgreSQL password |
+| `PROD_DIFY_BASE_URL` | deploy-production | e.g. `https://dify.internal` |
+| `PROD_DIFY_API_KEY` | deploy-production | Dify console API key for production |
+| `CI_POSTGRES_PASSWORD` | dify-compat | Optional — defaults to `ci-only-test-password` if not set |
 | `ARGOCD_TOKEN` | deploy-staging | Optional — ArgoCD auth token |
 | `ARGOCD_SERVER` | deploy-staging | Optional — ArgoCD server address |
 | `HARNESS_WEBHOOK_URL` | deploy-staging | Optional — Harness CD webhook |
