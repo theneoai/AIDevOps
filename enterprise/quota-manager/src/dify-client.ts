@@ -91,27 +91,41 @@ export class DifyConsoleClient {
       const kbRes = await this.client.get('/console/api/datasets', { params: { page: 1, limit: 1 } }).catch(() => ({ data: { total: 0 } }));
       const knowledgeBaseCount: number = kbRes.data?.total ?? 0;
 
-      // Aggregate token usage across all apps (best effort, limited by Dify API)
+      // Aggregate token usage across all apps (best effort, limited by Dify API).
+      // Collect partial sums from each app independently, then reduce — avoids
+      // shared mutable closure across concurrent async calls.
       let monthlyTokens = 0;
       let monthlyWorkflowRuns = 0;
       try {
         const statsRes = await this.client.get('/console/api/apps', { params: { page: 1, limit: 100 } });
         const apps: Array<{ id: string }> = statsRes.data?.data ?? [];
+        const start = last30DaysStr();
+        const end = todayStr();
 
-        await Promise.allSettled(
+        const partials = await Promise.allSettled(
           apps.slice(0, 20).map(async (app) => {
             const s = await this.client
               .get(`/console/api/apps/${app.id}/statistics/daily-conversations`, {
-                params: { start: last30DaysStr(), end: todayStr() },
+                params: { start, end },
               })
               .catch(() => null);
-            if (!s) return;
+            if (!s) return { tokens: 0, runs: 0 };
+            let tokens = 0;
+            let runs = 0;
             for (const day of (s.data?.data ?? []) as Array<{ completion_tokens: number; workflow_run_count?: number }>) {
-              monthlyTokens += day.completion_tokens ?? 0;
-              monthlyWorkflowRuns += day.workflow_run_count ?? 0;
+              tokens += day.completion_tokens ?? 0;
+              runs += day.workflow_run_count ?? 0;
             }
+            return { tokens, runs };
           }),
         );
+
+        for (const result of partials) {
+          if (result.status === 'fulfilled') {
+            monthlyTokens += result.value.tokens;
+            monthlyWorkflowRuns += result.value.runs;
+          }
+        }
       } catch {
         // Best-effort — don't fail quota check if stats are unavailable
       }

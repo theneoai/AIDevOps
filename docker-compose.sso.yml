@@ -50,7 +50,7 @@ services:
       - SSO_OIDC_ISSUER_URL=${SSO_OIDC_ISSUER_URL:-http://keycloak:8080/realms/dify-enterprise}
       - SSO_CLIENT_ID=${SSO_CLIENT_ID:-dify-enterprise}
       - SSO_CLIENT_SECRET=${SSO_CLIENT_SECRET:-changeme}
-      - SSO_COOKIE_SECRET=${SSO_COOKIE_SECRET:-changeme-32bytes-exactly-here!!}
+      - SSO_COOKIE_SECRET=${SSO_COOKIE_SECRET:-changeme-replace-with-32-byte-key}
       - SSO_EMAIL_DOMAIN=${SSO_EMAIL_DOMAIN:-*}
       - SSO_REDIRECT_URL=${SSO_REDIRECT_URL:-http://localhost/oauth2/callback}
     networks:
@@ -102,7 +102,7 @@ services:
     profiles:
       - keycloak
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-keycloak}"]
       interval: 10s
       timeout: 5s
       retries: 5

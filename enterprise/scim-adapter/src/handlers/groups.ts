@@ -30,7 +30,6 @@ async function hydrateGroups(client: DifyMemberClient, baseUrl: string): Promise
   const members = await client.listMembers();
 
   return STATIC_GROUPS.map((g) => {
-    const roleName = GROUP_TO_DIFY_ROLE[g.displayName] ?? '';
     const groupMembers = members
       .filter((m) => DIFY_ROLE_TO_GROUP[m.role] === g.displayName)
       .map((m) => ({
@@ -47,7 +46,6 @@ async function hydrateGroups(client: DifyMemberClient, baseUrl: string): Promise
         location: `${baseUrl}/scim/v2/Groups/${g.id}`,
       },
     };
-    void roleName;
   });
 }
 

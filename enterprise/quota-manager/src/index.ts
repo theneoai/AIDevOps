@@ -39,6 +39,12 @@ const tokenUsageGauge = new Gauge({
   labelNames: ['workspace_id'],
   registers: [registry],
 });
+const kbCountGauge = new Gauge({
+  name: 'enterprise_workspace_knowledge_base_count',
+  help: 'Number of knowledge bases in workspace',
+  labelNames: ['workspace_id'],
+  registers: [registry],
+});
 
 // ── Dependencies ───────────────────────────────────────────
 const difyClient = new DifyConsoleClient(
@@ -82,6 +88,7 @@ async function pollAndEnforce(): Promise<void> {
       memberUsageGauge.set({ workspace_id: u.workspaceId }, u.memberCount);
       appUsageGauge.set({ workspace_id: u.workspaceId }, u.appCount);
       tokenUsageGauge.set({ workspace_id: u.workspaceId }, u.monthlyTokens);
+      kbCountGauge.set({ workspace_id: u.workspaceId }, u.knowledgeBaseCount);
 
       if (report.status === 'exceeded') {
         logger.warn('Quota exceeded', {
@@ -117,10 +124,14 @@ app.use('/quotas', createQuotaRouter(store));
 async function start(): Promise<void> {
   await store.initialize();
 
-  // Schedule periodic polling
-  const cronExpr = `*/${Math.ceil(config.POLL_INTERVAL_SECONDS / 60)} * * * *`;
-  cron.schedule(cronExpr, pollAndEnforce);
-  logger.info(`Scheduled usage polling every ${config.POLL_INTERVAL_SECONDS}s`);
+  // Schedule periodic polling (cron resolution is 1 minute; sub-minute intervals round up)
+  const intervalMinutes = Math.max(1, Math.ceil(config.POLL_INTERVAL_SECONDS / 60));
+  const cronExpr = `*/${intervalMinutes} * * * *`;
+  cron.schedule(cronExpr, () => { void pollAndEnforce(); });
+  logger.info(`Scheduled usage polling every ${config.POLL_INTERVAL_SECONDS}s (cron: ${cronExpr})`);
+
+  // Daily snapshot pruning at 03:00 to prevent unbounded table growth
+  cron.schedule('0 3 * * *', () => { void store.pruneOldSnapshots(90); });
 
   // Run once immediately at startup
   await pollAndEnforce();

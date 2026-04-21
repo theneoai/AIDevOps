@@ -136,14 +136,35 @@ export class DifyPoller {
     }
   }
 
-  private async pollApps(): Promise<void> {
-    const appsRes = await this.client.get('/console/api/apps', {
-      params: { page: 1, limit: 100 },
-    }).catch(() => null);
-    if (!appsRes) return;
+  private async fetchAllApps(): Promise<App[]> {
+    const PAGE_SIZE = 100;
+    const allApps: App[] = [];
+    let page = 1;
 
-    const apps: App[] = appsRes.data?.data ?? [];
-    this.appCountGauge.set(appsRes.data?.total ?? apps.length);
+    while (true) {
+      const res = await this.client
+        .get('/console/api/apps', { params: { page, limit: PAGE_SIZE } })
+        .catch(() => null);
+      if (!res) break;
+
+      const batch: App[] = res.data?.data ?? [];
+      allApps.push(...batch);
+
+      // Set total count gauge from first page metadata
+      if (page === 1) {
+        this.appCountGauge.set(res.data?.total ?? allApps.length);
+      }
+
+      const total: number = res.data?.total ?? 0;
+      if (allApps.length >= total || batch.length < PAGE_SIZE) break;
+      page++;
+    }
+    return allApps;
+  }
+
+  private async pollApps(): Promise<void> {
+    const apps = await this.fetchAllApps();
+    if (apps.length === 0) return;
 
     const start = this.daysAgo(30);
     const end = this.today();

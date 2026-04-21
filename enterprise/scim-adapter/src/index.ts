@@ -9,6 +9,7 @@
  * this as Authorization: Bearer <token> in every SCIM request.
  * This is separate from user SSO; it's a long-lived service-to-service token.
  */
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import express, { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
@@ -20,7 +21,6 @@ import {
   SCIM_SCHEMA_ERROR,
   SCIM_SCHEMA_USER,
   SCIM_SCHEMA_GROUP,
-  STATIC_GROUPS,
 } from './scim-types';
 
 dotenv.config();
@@ -47,14 +47,21 @@ const logger = createLogger();
 const app = express();
 app.use(express.json({ type: ['application/json', 'application/scim+json'] }));
 
-// ── Bearer token authentication ────────────────────────────
+// ── Bearer token authentication (timing-safe comparison) ──
 function requireBearer(req: Request, res: Response, next: NextFunction): void {
   const auth = req.headers['authorization'];
   if (!auth?.startsWith('Bearer ')) {
     res.status(401).json({ schemas: [SCIM_SCHEMA_ERROR], status: 401, detail: 'Missing Bearer token' });
     return;
   }
-  if (auth.slice(7) !== config.SCIM_BEARER_TOKEN) {
+  const provided = Buffer.from(auth.slice(7));
+  const expected = Buffer.from(config.SCIM_BEARER_TOKEN);
+  // Pad to equal length before comparison to prevent length-based timing leaks
+  const padded = Buffer.alloc(Math.max(provided.length, expected.length));
+  provided.copy(padded);
+  const expectedPadded = Buffer.alloc(padded.length);
+  expected.copy(expectedPadded);
+  if (!crypto.timingSafeEqual(padded, expectedPadded)) {
     res.status(403).json({ schemas: [SCIM_SCHEMA_ERROR], status: 403, detail: 'Invalid Bearer token' });
     return;
   }
@@ -130,8 +137,6 @@ app.get('/scim/v2/ResourceTypes', (_req: Request, res: Response) => {
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'scim-adapter', version: '1.0.0' });
 });
-
-void STATIC_GROUPS; // referenced in group handlers
 
 app.listen(config.PORT, () => {
   logger.info('SCIM adapter started', { port: config.PORT, env: config.NODE_ENV });

@@ -52,10 +52,17 @@ const cronExpr = `*/${config.ANALYTICS_POLL_INTERVAL_MINUTES} * * * *`;
 cron.schedule(cronExpr, () => { void poller.poll(); });
 logger.info(`Scheduled analytics polling every ${config.ANALYTICS_POLL_INTERVAL_MINUTES} min`);
 
-app.listen(config.PORT, async () => {
+const server = app.listen(config.PORT, () => {
   logger.info('Analytics service started', { port: config.PORT, env: config.NODE_ENV });
-  // Initial poll on startup
-  await poller.poll();
+  // Initial poll on startup — errors are caught inside poller.poll()
+  poller.poll().catch((err) => {
+    logger.error('Initial analytics poll failed', { error: String(err) });
+  });
+});
+
+server.on('error', (err) => {
+  logger.error('Server error', { error: String(err) });
+  process.exit(1);
 });
 
 export default app;

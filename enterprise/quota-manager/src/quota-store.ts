@@ -171,6 +171,21 @@ export class QuotaStore {
     return res.rows[0] ? rowToSnapshot(res.rows[0]) : null;
   }
 
+  /** Prune snapshots older than retentionDays (default 90) to prevent unbounded table growth. */
+  async pruneOldSnapshots(retentionDays = 90): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+    const res = await this.pool.query(
+      'DELETE FROM usage_snapshots WHERE snapshot_at < $1',
+      [cutoff],
+    );
+    const deleted = res.rowCount ?? 0;
+    if (deleted > 0) {
+      logger.info('Pruned old usage snapshots', { deleted, retentionDays });
+    }
+    return deleted;
+  }
+
   buildReport(policy: QuotaPolicy, usage: UsageSnapshot | null): QuotaReport {
     const violations: string[] = [];
     const warnings: string[] = [];
@@ -182,7 +197,8 @@ export class QuotaStore {
         max: number | null,
         threshold: number,
       ) => {
-        if (max === null) return;
+        // null = unlimited; 0 would cause divide-by-zero, treat as unlimited
+        if (max === null || max <= 0) return;
         const pct = (current / max) * 100;
         if (current >= max) {
           violations.push(`${label}: ${current}/${max} (limit exceeded)`);
