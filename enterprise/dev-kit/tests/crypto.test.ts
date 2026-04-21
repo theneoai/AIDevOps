@@ -3,17 +3,29 @@
  */
 
 import { encryptServerUrl, sha256 } from '../src/registry/crypto';
+import { generateKeyPairSync } from 'crypto';
 import { execFileSync } from 'child_process';
 
-// Generate a test RSA key using Python
 function generateTestKey(): string {
-  const script = `
-from Crypto.PublicKey import RSA
-key = RSA.generate(2048)
-print(key.publickey().export_key().decode())
-`;
-  return execFileSync('python3', ['-c', script], { encoding: 'utf-8' }).trim();
+  const { publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+  });
+  return publicKey as string;
 }
+
+/** Returns true when the Python pycryptodome library is available */
+function pycryptoAvailable(): boolean {
+  try {
+    execFileSync('python3', ['-c', 'from Crypto.Cipher import AES'], { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const maybeDescribeEncrypt = pycryptoAvailable() ? describe : describe.skip;
 
 describe('sha256', () => {
   it('should generate correct SHA-256 hash', () => {
@@ -28,7 +40,7 @@ describe('sha256', () => {
   });
 });
 
-describe('encryptServerUrl', () => {
+maybeDescribeEncrypt('encryptServerUrl', () => {
   let publicKey: string;
 
   beforeAll(() => {

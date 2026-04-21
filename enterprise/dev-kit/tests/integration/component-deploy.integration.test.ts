@@ -34,30 +34,32 @@ const testTool: ToolDSL = {
 
 maybeDescribe('DifyApiAdapter — component deploy round-trip', () => {
   let adapter: DifyApiAdapter;
+  let deployedProviderId: string;
 
   beforeAll(() => {
     adapter = new DifyApiAdapter(BASE_URL!, API_KEY!);
   });
 
-  test('deploy creates tool provider', async () => {
-    const result = await adapter.deployTool(testTool);
-    expect(result).toHaveProperty('id');
-    expect(result).toHaveProperty('name', testTool.metadata.name);
+  test('registerTool creates tool provider', async () => {
+    const result = await adapter.registerTool(testTool);
+    expect(result).toHaveProperty('success', true);
+    expect(result).toHaveProperty('providerId');
+    deployedProviderId = result.providerId;
   });
 
-  test('list returns deployed tool', async () => {
-    const tools = await adapter.listTools();
-    const deployed = tools.find((t) => t.name === testTool.metadata.name);
+  test('listProviders returns deployed tool', async () => {
+    const providers = await adapter.listProviders();
+    const deployed = providers.find((p) => p.name === testTool.metadata.name);
     expect(deployed).toBeDefined();
   });
 
-  test('delete removes deployed tool', async () => {
-    await expect(adapter.deleteTool(testTool.metadata.name)).resolves.not.toThrow();
+  test('deleteProvider removes deployed tool', async () => {
+    await expect(adapter.deleteProvider(deployedProviderId)).resolves.not.toThrow();
   });
 
   test('tool is absent after deletion', async () => {
-    const tools = await adapter.listTools();
-    const deployed = tools.find((t) => t.name === testTool.metadata.name);
+    const providers = await adapter.listProviders();
+    const deployed = providers.find((p) => p.name === testTool.metadata.name);
     expect(deployed).toBeUndefined();
   });
 });
