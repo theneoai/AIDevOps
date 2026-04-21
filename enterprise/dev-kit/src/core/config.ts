@@ -88,7 +88,7 @@ const DEFAULT_CONFIG: DevKitConfig = {
       database: '${DIFY_DB_NAME:-dify}',
     },
   },
-  componentsDir: './enterprise/components',
+  componentsDir: './enterprise/components',  // overridden by dify-dev.yaml in practice
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -213,6 +213,13 @@ export function loadConfig(startDir?: string): DevKitConfig {
   if (configPath) {
     const fileConfig = loadYamlFile(configPath);
     config = deepSubstituteEnvVars(deepMerge(config, fileConfig)) as DevKitConfig;
+
+    // Resolve componentsDir relative to the config file's directory,
+    // not relative to process.cwd() — ensures `dify-dev validate` works
+    // regardless of which directory the CLI is invoked from.
+    if (!path.isAbsolute(config.componentsDir)) {
+      config.componentsDir = path.resolve(path.dirname(configPath), config.componentsDir);
+    }
   } else {
     config = deepSubstituteEnvVars(config);
   }
