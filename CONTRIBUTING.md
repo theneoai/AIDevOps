@@ -40,6 +40,9 @@ USE_LOCAL_LLM=true make devkit-test
 
 # Type checking
 cd enterprise/dev-kit && npm run typecheck
+
+# Check component status without a live Dify instance
+node enterprise/dev-kit/dist/cli.js status --offline
 ```
 
 ---
@@ -96,6 +99,24 @@ argocd/             # GitOps ApplicationSet
 - DSL types live in `enterprise/dev-kit/src/types/dsl.ts`
 - Schema validation is in `enterprise/dev-kit/src/commands/validate.ts`
 - Update the corresponding compiler in `enterprise/dev-kit/src/compilers/`
+
+### Developing the VSCode Extension
+
+The extension lives in `vscode-dify-dev/`.
+
+```bash
+cd vscode-dify-dev
+npm install
+
+# Open in VS Code with extension host
+code --extensionDevelopmentPath=$(pwd) ..
+
+# Package for distribution
+npx vsce package        # produces a .vsix file
+```
+
+Key entry point: `vscode-dify-dev/src/extension.ts`  
+The extension registers three commands (`dify.validate`, `dify.deploy`, `dify.watch`) that shell out to the DevKit CLI.
 
 ---
 

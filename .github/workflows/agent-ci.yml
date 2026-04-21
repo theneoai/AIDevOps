@@ -253,10 +253,16 @@ jobs:
           extra_args: --only-verified
         continue-on-error: true
 
-      - name: SAST with CodeQL
+      - name: SAST with CodeQL (init)
         uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
+        continue-on-error: true
+
+      - name: SAST with CodeQL (analyze)
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript-typescript'
         continue-on-error: true
 
       - name: License compliance check

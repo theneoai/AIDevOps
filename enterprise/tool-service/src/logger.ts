@@ -11,3 +11,5 @@ export const createLogger = () => {
     transports: [new winston.transports.Console()],
   });
 };
+
+export const logger = createLogger();

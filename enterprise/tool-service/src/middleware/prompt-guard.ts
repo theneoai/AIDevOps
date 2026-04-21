@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../logger';
 
 const INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(all\s+)?previous\s+instructions?/i,
@@ -35,7 +36,7 @@ export function promptGuard(req: Request, res: Response, next: NextFunction): vo
     }
     for (const pattern of INJECTION_PATTERNS) {
       if (pattern.test(value)) {
-        console.warn(`[PromptGuard] Injection pattern detected in field '${field}' from ${req.ip}`);
+        logger.warn('Prompt injection pattern detected', { field, ip: req.ip, pattern: pattern.toString() });
         res.status(400).json({ error: 'Input contains disallowed content' });
         return;
       }

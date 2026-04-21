@@ -69,4 +69,8 @@ Input is limited to 4000 characters at the tool-service boundary.
 ## Known Limitations
 
 - The `dify.adapter=db` mode is deprecated and bypasses the API auth layer. Do not use it in production.
-- WeChat `access_token` is cached in memory — a process restart requires re-authentication.
+- **WeChat `access_token` memory caching** — The token is cached in process memory. A container restart triggers a full re-authentication against the WeChat API, which counts toward the per-day token refresh quota (currently 2 000 calls/day). In high-churn environments (e.g., frequent rolling restarts), consider externalising the token in Redis and sharing it across replicas to avoid quota exhaustion.
+- **Prompt injection guard is allowlist-only** — The `promptGuard` middleware blocks 10 known pattern classes. Novel jailbreak variants not yet in the list will pass through. Supplement with a dedicated LLM-based content filter (e.g., Lakera Guard, Guardrails AI) for higher-assurance deployments.
+- **PII fallback to regex-only** — When Presidio is unavailable, Chinese PII detection degrades to regex patterns and will miss structured-data PII (e.g., medical codes, passport numbers). Monitor Presidio availability via the `/health` endpoint on the security stack.
+- **JWT RS256 not supported** — The RBAC middleware validates tokens with HS256 (shared secret) only. For OIDC/federated identity providers that issue RS256 tokens, integrate through the SSO gateway (`docker-compose.sso.yml`) which re-signs tokens before forwarding them to the tool service.
+- **Single-region only** — The current Kubernetes manifests and ArgoCD ApplicationSet target a single cluster. Cross-region active-active deployments require additional work (distributed session affinity, replicated secrets management).
