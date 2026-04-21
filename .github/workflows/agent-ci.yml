@@ -105,6 +105,10 @@ jobs:
     name: 'Dify Compatibility Check'
     runs-on: ubuntu-latest
     needs: [validate]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[dify-upgrade]')) ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[dify-upgrade]'))
     timeout-minutes: 10
     services:
       postgres:
@@ -346,6 +350,7 @@ jobs:
     name: 'Build Images'
     runs-on: ubuntu-latest
     needs: [test-unit, security]
+    if: github.event_name != 'pull_request'
     timeout-minutes: 20
     permissions:
       contents: read

@@ -400,9 +400,17 @@ The CI pipeline detects `[dify-upgrade]` in commit messages and automatically ru
 The pipeline runs 7 stages. See [GitHub Actions documentation](docs/github-actions.md) for full details.
 
 ```
-validate → dify-compat → test-unit ─┐
-                                     ├─→ build → deploy-staging → integration-tests → deploy-production
-                        security  ──┘
+                    validate
+                   /    |    \
+         dify-compat  test-unit  security   (parallel; dify-compat only on [dify-upgrade])
+                          \       /
+                           build
+                             |
+                      deploy-staging
+                             |
+                    integration-tests
+                             |
+                    deploy-production  (HITL gated)
 ```
 
 **Manual triggers** support `deploy_env` (staging/production) and `skip_tests` (emergency deploys).
