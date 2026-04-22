@@ -36,3 +36,10 @@ coverage/
 
 # Secrets — never commit these files
 secrets/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/

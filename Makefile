@@ -1,4 +1,4 @@
-.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-validate devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets sso-up sso-down sso-keycloak-up llm-gateway-up llm-gateway-down enterprise-plus-up enterprise-plus-down quota-status scim-test analytics-up
+.PHONY: init build up down logs status health restart clean up-all down-all dify-up dify-down register-tools devkit-build devkit-test devkit-deploy devkit-validate devkit-status observability-up observability-down security-up security-down standalone-up standalone-down init-secrets sso-up sso-down sso-keycloak-up llm-gateway-up llm-gateway-down enterprise-plus-up enterprise-plus-down quota-status scim-test analytics-up register-pipeline pipeline-init pipeline-status
 
 # ─── 初始化 ───
 init:
@@ -96,6 +96,26 @@ register-tools:
 	@docker cp enterprise/scripts/register-tools.py docker-api-1:/tmp/register-tools.py
 	@docker exec docker-api-1 python3 /tmp/register-tools.py
 	@echo "✓ 工具注册完成"
+
+# ─── 企业流水线注册 ─────────────────────────────────────────────
+# register-pipeline: 手动触发一次流水线注册
+# pipeline-init:     同上（别名），与 docker compose 服务名对齐
+# pipeline-status:   查看 pipeline-init 容器运行状态与日志
+register-pipeline:
+	@echo "=== 注册 Enterprise AI DevOps Pipeline 到 Dify ==="
+	@echo "  需要在 .env 中配置 DIFY_CONSOLE_EMAIL / DIFY_CONSOLE_PASSWORD"
+	@docker compose run --rm pipeline-init
+	@echo "✓ 流水线注册完成"
+	@echo "  在 Dify UI 刷新页面，搜索 'Enterprise AI DevOps Pipeline' 即可看到流水线"
+
+pipeline-init: register-pipeline
+
+pipeline-status:
+	@echo "=== pipeline-init 容器状态 ==="
+	@docker compose ps pipeline-init
+	@echo ""
+	@echo "=== pipeline-init 最近日志 ==="
+	@docker compose logs --tail=40 pipeline-init 2>/dev/null || echo "  (容器未运行)"
 
 # ─── DevKit CLI ───
 devkit-build:
