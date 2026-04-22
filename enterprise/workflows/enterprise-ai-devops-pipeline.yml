@@ -1,0 +1,357 @@
+app:
+  description: |
+    Enterprise AI DevOps analysis and review pipeline. Accepts code, documents,
+    or any content and performs multi-stage AI analysis with automatic risk routing.
+    High/critical risk content receives a second-pass deep analysis with structured
+    remediation recommendations. Suitable for code review, security audits, and
+    content compliance workflows.
+  icon: "\U0001F504"
+  icon_background: '#FFEAD5'
+  mode: workflow
+  name: Enterprise AI DevOps Pipeline
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.1.3
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+        - .JPG
+        - .JPEG
+        - .PNG
+        - .GIF
+        - .WEBP
+        - .SVG
+      allowed_file_types:
+        - image
+      allowed_file_upload_methods:
+        - local_file
+        - remote_url
+      enabled: false
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+          - local_file
+          - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: llm
+        id: edge-start-prescreen
+        source: start
+        sourceHandle: source
+        target: llm-pre-screen
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: if-else
+        id: edge-prescreen-ifelse
+        source: llm-pre-screen
+        sourceHandle: source
+        target: if-else-risk
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: if-else
+          targetType: llm
+        id: edge-ifelse-deep-true
+        source: if-else-risk
+        sourceHandle: 'true'
+        target: llm-deep-analysis
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: end
+        id: edge-deep-end
+        source: llm-deep-analysis
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: if-else
+          targetType: end
+        id: edge-ifelse-end-false
+        source: if-else-risk
+        sourceHandle: 'false'
+        target: end
+        targetHandle: target
+        type: custom
+    nodes:
+      # ── Node 1: Start ─────────────────────────────────────────
+      - data:
+          desc: 'Input: content to analyze, analysis type, and optional requester name'
+          selected: false
+          title: Start
+          type: start
+          variables:
+            - label: Content to Analyze
+              max_length: 10000
+              options: []
+              required: true
+              type: paragraph
+              variable: content
+            - label: Analysis Type
+              options:
+                - Code Review
+                - Document Review
+                - Risk Assessment
+                - Security Audit
+              required: true
+              type: select
+              variable: analysis_type
+            - label: Requester Name
+              max_length: 100
+              options: []
+              required: false
+              type: text-input
+              variable: requester
+        height: 154
+        id: start
+        position:
+          x: 80
+          y: 282
+        positionAbsolute:
+          x: 80
+          y: 282
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      # ── Node 2: LLM Pre-Screening ──────────────────────────────
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: 'Quick AI classification: risk level, summary, and concern flags'
+          model:
+            completion_params:
+              temperature: 0.1
+              max_tokens: 1024
+            mode: chat
+            name: gpt-4o-mini
+            provider: openai
+          prompt_template:
+            - id: system-pre-screen
+              role: system
+              text: |
+                You are an enterprise AI analysis system performing initial risk screening.
+
+                Analyze the provided content and return ONLY valid JSON (no markdown fence, no extra text):
+                {
+                  "risk_level": "low|medium|high|critical",
+                  "content_category": "brief category description",
+                  "summary": "50-word summary of the content",
+                  "flags": ["concern1", "concern2"],
+                  "approved": true,
+                  "confidence": 0.95
+                }
+
+                Risk level definitions:
+                - low: No significant concerns, approved for use
+                - medium: Minor issues present, review recommended but not blocking
+                - high: Significant issues requiring deep analysis before approval
+                - critical: Immediate action required, do not approve
+            - id: user-pre-screen
+              role: user
+              text: |
+                Analysis Type: {{#start.analysis_type#}}
+                Requester: {{#start.requester#}}
+
+                Content to analyze:
+                ---
+                {{#start.content#}}
+                ---
+          selected: false
+          title: Pre-Screening Analysis
+          type: llm
+          variables: []
+          vision:
+            configs:
+              detail: high
+            enabled: false
+        height: 98
+        id: llm-pre-screen
+        position:
+          x: 400
+          y: 282
+        positionAbsolute:
+          x: 400
+          y: 282
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      # ── Node 3: Risk Level IF-ELSE ────────────────────────────
+      - data:
+          conditions:
+            - comparison_operator: contains
+              id: cond-high-risk
+              value: '"risk_level": "high"'
+              variable_selector:
+                - llm-pre-screen
+                - text
+            - comparison_operator: contains
+              id: cond-critical-risk
+              value: '"risk_level": "critical"'
+              variable_selector:
+                - llm-pre-screen
+                - text
+          desc: 'Route high/critical risk content to deep analysis, pass low/medium directly'
+          logical_operator: or
+          selected: false
+          title: High / Critical Risk?
+          type: if-else
+        height: 126
+        id: if-else-risk
+        position:
+          x: 720
+          y: 282
+        positionAbsolute:
+          x: 720
+          y: 282
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      # ── Node 4: LLM Deep Analysis (high/critical path only) ───
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: 'Comprehensive second-pass analysis for high/critical risk content'
+          model:
+            completion_params:
+              temperature: 0.2
+              max_tokens: 2048
+            mode: chat
+            name: gpt-4o
+            provider: openai
+          prompt_template:
+            - id: system-deep-analysis
+              role: system
+              text: |
+                You are a senior enterprise security and quality analyst.
+                Initial screening flagged this content as HIGH or CRITICAL risk.
+
+                Provide comprehensive deep analysis. Return ONLY valid JSON:
+                {
+                  "approved": false,
+                  "risk_level": "high|critical",
+                  "executive_summary": "3-5 sentence executive summary for management",
+                  "detailed_issues": [
+                    {
+                      "severity": "critical|high|medium",
+                      "category": "security|quality|compliance|performance",
+                      "description": "detailed issue description",
+                      "recommendation": "specific remediation step",
+                      "line_reference": "optional line or section reference"
+                    }
+                  ],
+                  "action_required": "immediate|scheduled-review|monitor",
+                  "remediation_effort": "estimated hours or days",
+                  "compliance_impact": ["OWASP", "SOC2", "ISO27001"],
+                  "next_steps": ["step 1", "step 2", "step 3"]
+                }
+            - id: user-deep-analysis
+              role: user
+              text: |
+                Analysis Type: {{#start.analysis_type#}}
+                Requester: {{#start.requester#}}
+
+                Initial Screening Result:
+                {{#llm-pre-screen.text#}}
+
+                Full Content for Deep Analysis:
+                ---
+                {{#start.content#}}
+                ---
+          selected: false
+          title: Deep Risk Analysis
+          type: llm
+          variables: []
+          vision:
+            configs:
+              detail: high
+            enabled: false
+        height: 98
+        id: llm-deep-analysis
+        position:
+          x: 1040
+          y: 100
+        positionAbsolute:
+          x: 1040
+          y: 100
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+      # ── Node 5: End ──────────────────────────────────────────
+      - data:
+          desc: 'Pipeline output: screening result + optional deep analysis'
+          outputs:
+            - type: string
+              value_selector:
+                - llm-pre-screen
+                - text
+              variable: screening_result
+            - type: string
+              value_selector:
+                - llm-deep-analysis
+                - text
+              variable: deep_analysis_result
+          selected: false
+          title: End
+          type: end
+        height: 98
+        id: end
+        position:
+          x: 1360
+          y: 282
+        positionAbsolute:
+          x: 1360
+          y: 282
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.8

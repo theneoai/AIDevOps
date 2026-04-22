@@ -286,6 +286,32 @@ services:
       - devkit
     command: ["status"]
 
+  # ─── 企业流水线初始化 ───────────────────────────────────────────
+  # 项目启动时自动将 Enterprise AI DevOps Pipeline 注册到 Dify。
+  # 幂等设计：若流水线已存在则跳过，保留用户在 Dify UI 中的修改。
+  # 依赖 DIFY_CONSOLE_EMAIL / DIFY_CONSOLE_PASSWORD（在 .env 中设置）。
+  pipeline-init:
+    build:
+      context: ./enterprise/scripts/pipeline-init
+    container_name: pipeline-init
+    volumes:
+      - ./enterprise/workflows/enterprise-ai-devops-pipeline.yml:/app/enterprise-ai-devops-pipeline.yml:ro
+    environment:
+      # Dify 控制台访问地址（容器内部地址，需与 Dify 同网络）
+      - DIFY_CONSOLE_URL=${DIFY_CONSOLE_URL:-http://nginx}
+      # Dify 管理员账号（必填，否则跳过注册）
+      - DIFY_CONSOLE_EMAIL=${DIFY_CONSOLE_EMAIL:-}
+      - DIFY_CONSOLE_PASSWORD=${DIFY_CONSOLE_PASSWORD:-}
+      # 流水线在 Dify UI 中显示的名称
+      - PIPELINE_NAME=${ENTERPRISE_PIPELINE_NAME:-Enterprise AI DevOps Pipeline}
+      # 等待 Dify 就绪的重试次数和间隔（秒）
+      - MAX_RETRIES=${PIPELINE_INIT_MAX_RETRIES:-20}
+      - RETRY_DELAY=${PIPELINE_INIT_RETRY_DELAY:-15}
+    networks:
+      - dify-network
+    # 失败时自动重试（最多 5 次），确保 Dify 启动慢时不会遗漏注册
+    restart: on-failure:5
+
 volumes:
   quota_db_data:
     driver: local
