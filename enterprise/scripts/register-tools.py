@@ -81,6 +81,59 @@ ENTERPRISE_SERVICES = {
             }
         ]
     },
+    'mcp-news-aggregator': {
+        'name': 'AI 新闻聚合',
+        'type': 'mcp',
+        'url': 'http://host.docker.internal:3010/sse',
+        'identifier': 'mcp-news-aggregator',
+        'icon': 'https://cdn.jsdelivr.net/npm/@anthropic-icons/svg/1.0.0/icons/newspaper.svg',
+        'tools': [
+            {
+                'name': 'collect_ai_news',
+                'description': '收集最新 AI 科技新闻，支持 Hacker News、OpenAI Blog、Google DeepMind 等 RSS 源',
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'maxItems': {'type': 'number', 'description': '最大收集条数 (默认 20)'}
+                    }
+                }
+            },
+            {
+                'name': 'generate_news_article',
+                'description': '根据收集的新闻生成格式化的 AI 周报文章（Markdown 格式）',
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'newsData': {'type': 'string', 'description': 'collect_ai_news 返回的 JSON 数据'},
+                        'date': {'type': 'string', 'description': '文章日期 (可选，默认当天)'}
+                    },
+                    'required': ['newsData']
+                }
+            },
+            {
+                'name': 'publish_wechat_draft',
+                'description': '将文章发布为微信公众号草稿',
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'title': {'type': 'string', 'description': '文章标题'},
+                        'content': {'type': 'string', 'description': '文章正文 (Markdown)'}
+                    },
+                    'required': ['title', 'content']
+                }
+            },
+            {
+                'name': 'run_full_workflow',
+                'description': '运行完整的 AI 新闻聚合工作流：收集新闻 → 生成文章 → 可选发布到微信公众号',
+                'inputSchema': {
+                    'type': 'object',
+                    'properties': {
+                        'publishToWeChat': {'type': 'boolean', 'description': '是否发布到微信公众号 (默认 false)'}
+                    }
+                }
+            }
+        ]
+    },
     'enterprise-tool-service': {
         'name': '企业通用工具服务',
         'type': 'api',
@@ -98,7 +151,7 @@ def get_db_connection():
     try:
         import psycopg2
         conn = psycopg2.connect(
-            host=os.getenv('DIFY_DB_HOST', 'db_postgres'),
+            host=os.getenv('DIFY_DB_HOST', 'localhost'),
             port=int(os.getenv('DIFY_DB_PORT', '5432')),
             user=os.getenv('DIFY_DB_USER', 'postgres'),
             password=os.getenv('DIFY_DB_PASSWORD', 'difyai123456'),

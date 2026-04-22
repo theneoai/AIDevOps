@@ -172,7 +172,7 @@ up-all: dify-up up
 	@echo "  make devkit-status    查看组件状态"
 	@echo "  make devkit-deploy name=xxx  部署组件"
 
-down-all: down dify-down
+down-all: standalone-down dify-down
 	@echo "=== 全部服务已停止 ==="
 
 # ─── P1: 可观测性服务 ───
