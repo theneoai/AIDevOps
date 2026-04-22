@@ -13,10 +13,6 @@ import * as yaml from 'yaml';
 // Type-safe Config Interface
 // ─────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────
-// Platform-agnostic database config (used only by the deprecated db adapter)
-// ─────────────────────────────────────────────────────────────
-
 export interface DatabaseConfig {
   host: string;
   port: number;
@@ -24,9 +20,6 @@ export interface DatabaseConfig {
   password: string;
   database: string;
 }
-
-/** @deprecated Use DatabaseConfig */
-export type DifyDatabaseConfig = DatabaseConfig;
 
 // ─────────────────────────────────────────────────────────────
 // Backend (platform) config
@@ -47,11 +40,8 @@ export interface BackendConfig {
    * When both are set, baseUrl takes precedence.
    */
   baseUrl?: string;
-  /**
-   * Adapter implementation: 'api' (default) or 'db' (@deprecated, Dify-specific).
-   * 'db' bypasses API validation and breaks on schema upgrades.
-   */
-  adapter?: 'api' | 'db';
+  /** Adapter implementation. Only 'api' is supported since v0.4.0. */
+  adapter?: 'api';
   /**
    * Minimum Dify version required by this DevKit configuration.
    * The compatibility check script uses this to block upgrades that would
@@ -64,12 +54,9 @@ export interface BackendConfig {
    * Use "x" as a wildcard patch segment, e.g. "1.14.x".
    */
   maxVersion?: string;
-  /** PostgreSQL connection — used by the deprecated db adapter only */
-  db: DatabaseConfig;
+  /** PostgreSQL connection — reserved for future direct-query use cases */
+  db?: DatabaseConfig;
 }
-
-/** @deprecated Use BackendConfig */
-export type DifyConfig = BackendConfig;
 
 export interface DevKitConfig {
   /**
@@ -92,15 +79,8 @@ const DEFAULT_CONFIG: DevKitConfig = {
     apiKey: '${DIFY_API_KEY:-}',
     baseUrl: '${DIFY_BASE_URL:-http://localhost/v1}',
     adapter: 'api',
-    db: {
-      host: '${DIFY_DB_HOST:-localhost}',
-      port: 5432,
-      user: '${DIFY_DB_USER:-postgres}',
-      password: '${DIFY_DB_PASSWORD:-difyai123456}',
-      database: '${DIFY_DB_NAME:-dify}',
-    },
   },
-  componentsDir: './enterprise/components',  // overridden by dify-dev.yaml in practice
+  componentsDir: './enterprise/components',
 };
 
 // ─────────────────────────────────────────────────────────────

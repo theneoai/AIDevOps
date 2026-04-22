@@ -6,6 +6,7 @@ import { createLogger } from './logger';
 import { DifyConsoleClient } from './dify-client';
 import { QuotaStore } from './quota-store';
 import { createQuotaRouter } from './routes/quotas';
+import { createPreflightRouter } from './routes/preflight';
 
 const logger = createLogger();
 const app = express();
@@ -119,6 +120,7 @@ app.get('/metrics', async (_req: Request, res: Response) => {
 });
 
 app.use('/quotas', createQuotaRouter(store));
+app.use('/quotas/preflight', createPreflightRouter(store));
 
 // ── Startup ────────────────────────────────────────────────
 async function start(): Promise<void> {

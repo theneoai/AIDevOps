@@ -69,6 +69,7 @@ program
       configPath: program.opts().config,
       verbose: program.opts().verbose,
       dryRun: program.opts().dryRun,
+      tenant: program.opts().tenant,
     });
   });
 

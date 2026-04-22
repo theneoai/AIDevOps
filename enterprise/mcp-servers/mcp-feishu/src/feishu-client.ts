@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { config } from './config';
+import { CircuitBreaker } from './circuit-breaker';
 
 interface TenantAccessTokenResponse {
   code: number;
@@ -12,6 +13,11 @@ export class FeishuClient {
   private client: AxiosInstance;
   private accessToken: string = '';
   private tokenExpiry: number = 0;
+  private breaker = new CircuitBreaker('feishu-api', {
+    failureThreshold: 5,
+    resetTimeoutMs: 30_000,
+    callTimeoutMs: 10_000,
+  });
 
   constructor() {
     this.client = axios.create({
@@ -23,9 +29,11 @@ export class FeishuClient {
   private async ensureToken(): Promise<void> {
     if (Date.now() < this.tokenExpiry - 60_000) return;
 
-    const res = await this.client.post<TenantAccessTokenResponse>(
-      '/open-apis/auth/v3/tenant_access_token/internal',
-      { app_id: config.feishuAppId, app_secret: config.feishuAppSecret },
+    const res = await this.breaker.call(() =>
+      this.client.post<TenantAccessTokenResponse>(
+        '/open-apis/auth/v3/tenant_access_token/internal',
+        { app_id: config.feishuAppId, app_secret: config.feishuAppSecret },
+      ),
     );
 
     if (res.data.code !== 0) {
@@ -43,39 +51,44 @@ export class FeishuClient {
 
   async sendMessage(chatId: string, text: string): Promise<string> {
     const headers = await this.authHeaders();
-    const res = await this.client.post(
-      '/open-apis/im/v1/messages',
-      {
-        receive_id: chatId,
-        msg_type: 'text',
-        content: JSON.stringify({ text }),
-      },
-      { params: { receive_id_type: 'chat_id' }, headers },
+    const res = await this.breaker.call(() =>
+      this.client.post(
+        '/open-apis/im/v1/messages',
+        {
+          receive_id: chatId,
+          msg_type: 'text',
+          content: JSON.stringify({ text }),
+        },
+        { params: { receive_id_type: 'chat_id' }, headers },
+      ),
     );
     return (res.data as Record<string, Record<string, string>>).data.message_id;
   }
 
   async createDocument(title: string, content: string): Promise<string> {
     const headers = await this.authHeaders();
-    const res = await this.client.post(
-      '/open-apis/docx/v1/documents',
-      { title, folder_token: '' },
-      { headers },
+    const res = await this.breaker.call(() =>
+      this.client.post(
+        '/open-apis/docx/v1/documents',
+        { title, folder_token: '' },
+        { headers },
+      ),
     );
     const docToken = (res.data as Record<string, Record<string, string>>).data.document.document_id;
 
-    // Append content as a text block
-    await this.client.post(
-      `/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}/children`,
-      {
-        children: [
-          {
-            block_type: 2,
-            text: { elements: [{ text_run: { content, text_element_style: {} } }], style: {} },
-          },
-        ],
-      },
-      { headers },
+    await this.breaker.call(() =>
+      this.client.post(
+        `/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}/children`,
+        {
+          children: [
+            {
+              block_type: 2,
+              text: { elements: [{ text_run: { content, text_element_style: {} } }], style: {} },
+            },
+          ],
+        },
+        { headers },
+      ),
     );
 
     return docToken;
@@ -83,18 +96,22 @@ export class FeishuClient {
 
   async updateDocument(docToken: string, content: string): Promise<void> {
     const headers = await this.authHeaders();
-    await this.client.patch(
-      `/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}`,
-      { update_text_elements: { elements: [{ text_run: { content } }] } },
-      { headers },
+    await this.breaker.call(() =>
+      this.client.patch(
+        `/open-apis/docx/v1/documents/${docToken}/blocks/${docToken}`,
+        { update_text_elements: { elements: [{ text_run: { content } }] } },
+        { headers },
+      ),
     );
   }
 
   async getDocumentContent(docToken: string): Promise<string> {
     const headers = await this.authHeaders();
-    const res = await this.client.get(
-      `/open-apis/docx/v1/documents/${docToken}/raw_content`,
-      { headers },
+    const res = await this.breaker.call(() =>
+      this.client.get(
+        `/open-apis/docx/v1/documents/${docToken}/raw_content`,
+        { headers },
+      ),
     );
     return (res.data as Record<string, Record<string, string>>).data.content;
   }
