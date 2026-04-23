@@ -11,9 +11,18 @@ import {
 import { config } from './config';
 import { createLogger } from './logger';
 import { getAccessToken } from './wechat/auth';
+import { initTokenStore, closeTokenStore } from './wechat/token-store';
+import { CircuitBreaker } from './circuit-breaker';
 import { PublishArticleParams, UploadImageParams } from './types/mcp';
 
 const logger = createLogger(config.LOG_LEVEL);
+
+// Circuit breaker protects against WeChat API outages
+const wechatBreaker = new CircuitBreaker('wechat-api', {
+  failureThreshold: 5,
+  resetTimeoutMs: 30_000,
+  callTimeoutMs: 10_000,
+});
 
 const tools: Tool[] = [
   {
@@ -131,7 +140,7 @@ function createMcpServer(): Server {
 }
 
 async function handlePublishArticle(params: PublishArticleParams): Promise<Record<string, unknown>> {
-  const token = await getAccessToken();
+  const token = await wechatBreaker.call(() => getAccessToken());
   logger.info('Publishing article', { title: params.title });
   return {
     status: 'success',
@@ -142,7 +151,7 @@ async function handlePublishArticle(params: PublishArticleParams): Promise<Recor
 }
 
 async function handleUploadImage(params: UploadImageParams): Promise<Record<string, unknown>> {
-  const token = await getAccessToken();
+  const token = await wechatBreaker.call(() => getAccessToken());
   logger.info('Uploading image', { image_url: params.image_url, type: params.type });
   return {
     status: 'success',
@@ -153,10 +162,11 @@ async function handleUploadImage(params: UploadImageParams): Promise<Record<stri
 }
 
 async function handleGetAccessToken(): Promise<Record<string, unknown>> {
-  const token = await getAccessToken();
+  const token = await wechatBreaker.call(() => getAccessToken());
   return {
     status: 'success',
     access_token_preview: token.substring(0, 10) + '...',
+    circuit_breaker_state: wechatBreaker.currentState,
     note: 'Full token available internally',
   };
 }
@@ -266,6 +276,11 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   }
 });
 
+// Initialize Redis-backed token store before accepting requests
+initTokenStore().catch((err) =>
+  logger.error('Token store init failed — falling back to disk cache', { error: String(err) }),
+);
+
 const httpServer = app.listen(config.MCP_SERVER_PORT, () => {
   logger.info(`MCP Server running on port ${config.MCP_SERVER_PORT}`, {
     path: config.MCP_SERVER_PATH,
@@ -273,19 +288,14 @@ const httpServer = app.listen(config.MCP_SERVER_PORT, () => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
+async function shutdown(signal: string): Promise<void> {
+  logger.info(`${signal} received, shutting down gracefully`);
+  await closeTokenStore();
   httpServer.close(() => {
     logger.info('HTTP server closed');
     process.exit(0);
   });
-});
+}
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  httpServer.close(() => {
-    logger.info('HTTP server closed');
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

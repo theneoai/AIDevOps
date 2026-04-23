@@ -1,0 +1,144 @@
+groups:
+  - name: aidevops.slo
+    interval: 30s
+    rules:
+      # ── SLO: Tool Service Latency ────────────────────────────────────────
+      # SLO: P99 latency < 500ms for /tools/* endpoints
+      - alert: ToolServiceHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{
+              job="enterprise-tool-service",
+              route=~"/tools/.*"
+            }[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "Tool service P99 latency exceeds 500ms"
+          description: "P99 latency is {{ $value | humanizeDuration }} over the last 5 minutes."
+
+      - alert: ToolServiceCriticalLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{
+              job="enterprise-tool-service",
+              route=~"/tools/.*"
+            }[5m])) by (le)
+          ) > 2.0
+        for: 2m
+        labels:
+          severity: critical
+          slo: latency
+        annotations:
+          summary: "Tool service P99 latency critically high (>2s)"
+          description: "P99 latency is {{ $value | humanizeDuration }}. Immediate investigation required."
+
+      # ── SLO: Error Rate ──────────────────────────────────────────────────
+      # SLO: error rate < 1% (5xx responses)
+      - alert: ToolServiceHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{
+            job="enterprise-tool-service",
+            status=~"5.."
+          }[5m]))
+          /
+          sum(rate(http_requests_total{job="enterprise-tool-service"}[5m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          slo: error_rate
+        annotations:
+          summary: "Tool service error rate exceeds 1% SLO"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: ToolServiceCriticalErrorRate
+        expr: |
+          sum(rate(http_requests_total{
+            job="enterprise-tool-service",
+            status=~"5.."
+          }[5m]))
+          /
+          sum(rate(http_requests_total{job="enterprise-tool-service"}[5m]))
+          > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          slo: error_rate
+        annotations:
+          summary: "Tool service error rate critically high (>5%)"
+          description: "Error rate is {{ $value | humanizePercentage }}."
+
+      # ── Rate Limiting ────────────────────────────────────────────────────
+      - alert: HighRateLimitRejections
+        expr: |
+          sum(rate(http_requests_total{
+            job="enterprise-tool-service",
+            status="429"
+          }[5m])) > 10
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate of 429 rejections — possible abuse or misconfigured client"
+          description: "{{ $value }} req/s being rate-limited."
+
+      # ── Quota Violations ─────────────────────────────────────────────────
+      - alert: WorkspaceQuotaExceeded
+        expr: enterprise_quota_status{} == 2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Workspace quota exceeded"
+          description: "Workspace {{ $labels.workspace_id }} ({{ $labels.workspace_name }}) has exceeded its quota."
+
+      - alert: WorkspaceQuotaWarning
+        expr: enterprise_quota_status{} == 1
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Workspace approaching quota limit"
+          description: "Workspace {{ $labels.workspace_id }} is approaching its quota limit."
+
+      # ── MCP Server Health ────────────────────────────────────────────────
+      - alert: McpServerDown
+        expr: up{job=~"mcp-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MCP server {{ $labels.job }} is down"
+          description: "MCP server has been unreachable for 2 minutes."
+
+      # ── Circuit Breaker ──────────────────────────────────────────────────
+      # (logged as structured log events; alert based on error count as proxy)
+      - alert: WeeChatApiErrors
+        expr: |
+          sum(rate(http_client_requests_total{
+            job="mcp-wechat",
+            status=~"4..|5.."
+          }[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WeChat API returning errors — circuit breaker may open"
+          description: "{{ $value }} error req/s to WeChat API."
+
+      # ── LLM Token Burn Rate ──────────────────────────────────────────────
+      - alert: HighTokenBurnRate
+        expr: |
+          sum by (workspace_id) (
+            rate(enterprise_workspace_monthly_tokens[1h])
+          ) * 24 * 30 > 1000000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High token burn rate — projected to exceed 1M tokens/month"
+          description: "Workspace {{ $labels.workspace_id }} burn rate projects {{ $value | humanize }} tokens/month."

@@ -10,15 +10,26 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { loadConfig } from '../core/config';
 import { DifyClient } from '../registry/dify-client';
+import { resolveTenant, setTenantContext } from '../core/tenant-context';
 
 export interface DeployOptions {
   configPath?: string;
   verbose?: boolean;
   dryRun?: boolean;
+  tenant?: string;
 }
 
 export async function deployCommand(name: string, options: DeployOptions): Promise<void> {
   const config = loadConfig();
+
+  // Wire tenant context so adapter and audit service know which tenant is active
+  const tenantCtx = resolveTenant(options.tenant, undefined, config.dify.apiKey, config.dify.baseUrl);
+  setTenantContext(tenantCtx);
+
+  if (options.verbose) {
+    console.log(chalk.gray(`  Tenant: ${tenantCtx.tenantId}`));
+  }
+
   const componentsDir = config.componentsDir;
   const filePath = path.join(componentsDir, `${name}.yml`);
 
