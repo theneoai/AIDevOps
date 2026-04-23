@@ -4,6 +4,7 @@ set -euo pipefail
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 echo "Initializing Enterprise Agent Framework..."
@@ -52,6 +53,47 @@ if docker network inspect dify-network &> /dev/null; then
 else
     docker network create dify-network
     echo -e "${GREEN}✓ Created docker network 'dify-network'${NC}"
+fi
+
+# Apply dify network fix patch if not already applied
+apply_dify_network_patch() {
+    local dify_dir="dify/docker"
+    local patch_file="enterprise/patches/dify-network-fix.patch"
+
+    if [ ! -d "$dify_dir" ]; then
+        echo -e "${RED}✗ Dify directory not found at $dify_dir${NC}"
+        return 1
+    fi
+
+    if [ ! -f "$patch_file" ]; then
+        echo -e "${RED}✗ Patch file not found at $patch_file${NC}"
+        return 1
+    fi
+
+    # Check if patch is already applied (look for dify-network in docker-compose.yaml)
+    if grep -q "dify-network" "$dify_dir/docker-compose.yaml" 2>/dev/null; then
+        echo -e "${GREEN}✓ Dify network patch already applied${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}⚠ Applying dify network fix patch...${NC}"
+    (cd "$dify_dir" && git am "$patch_file") 2>/dev/null && {
+        echo -e "${GREEN}✓ Dify network patch applied successfully${NC}"
+        return 0
+    } || {
+        # If git am fails, patch might already be applied or conflict
+        if grep -q "dify-network" "$dify_dir/docker-compose.yaml" 2>/dev/null; then
+            echo -e "${GREEN}✓ Dify network patch already applied${NC}"
+            return 0
+        fi
+        echo -e "${RED}✗ Failed to apply dify network patch${NC}"
+        return 1
+    fi
+}
+
+# Apply patch if DIFY_DIR is set and we're in the right context
+if [ -d "dify/docker" ] && [ -f "enterprise/patches/dify-network-fix.patch" ]; then
+    apply_dify_network_patch || true
 fi
 
 # Create necessary directories

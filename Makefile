@@ -158,6 +158,19 @@ dify-up:
 		cp dify/docker/middleware.env.example dify/docker/middleware.env; \
 		echo "已创建 middleware.env"; \
 	fi
+	@echo "=== 应用 Dify 网络修复补丁 ==="
+	@if [ -f "enterprise/patches/dify-network-fix.patch" ]; then \
+		if grep -q "dify-network" dify/docker/docker-compose.yaml 2>/dev/null; then \
+			echo "  补丁已应用，跳过"; \
+		else \
+			cd dify/docker && git am ../../enterprise/patches/dify-network-fix.patch 2>/dev/null && cd ../.. || { \
+				echo "  补丁应用失败，尝试强制应用..."; \
+				git am --force ../../enterprise/patches/dify-network-fix.patch 2>/dev/null || true; \
+			}; \
+		fi; \
+	else \
+		echo "  ⚠️  补丁文件不存在，跳过"; \
+	fi
 	@cd dify/docker && docker-compose -f docker-compose.yaml -f docker-compose.middleware.yaml up -d
 	@echo "=== 连接企业服务到 Dify 网络 ==="
 	@sleep 5
