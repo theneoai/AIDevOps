@@ -1,0 +1,106 @@
+From 711ad8027bb3e225768f5735fddf01900288ed24 Mon Sep 17 00:00:00 2001
+From: Bot-lucas-hsueh <lucas_hsueh_bot@outlook.com>
+Date: Thu, 23 Apr 2026 23:13:39 +0800
+Subject: [PATCH 1/2] network: add dify-network to api, web, worker,
+ plugin_daemon services
+
+Adds external dify-network to enable communication between Dify services
+and enterprise services (enterprise-tool-service, mcp-*, etc.) running
+in the parent project's docker-compose setup.
+
+Services updated: api, worker, worker_beat, web, plugin_daemon
+---
+ docker/docker-compose.yaml | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/docker/docker-compose.yaml b/docker/docker-compose.yaml
+index a10fdf7..736a669 100644
+--- a/docker/docker-compose.yaml
++++ b/docker/docker-compose.yaml
+@@ -786,6 +786,7 @@ services:
+     networks:
+       - ssrf_proxy_network
+       - default
++      - dify-network
+ 
+   # worker service
+   # The Celery worker for processing all queues (dataset, workflow, mail, etc.)
+@@ -832,6 +833,7 @@ services:
+     networks:
+       - ssrf_proxy_network
+       - default
++      - dify-network
+ 
+   # worker_beat service
+   # Celery beat for scheduling periodic tasks.
+@@ -870,6 +872,7 @@ services:
+     networks:
+       - ssrf_proxy_network
+       - default
++      - dify-network
+ 
+   # Frontend web application.
+   web:
+@@ -901,6 +904,9 @@ services:
+       ENABLE_WEBSITE_JINAREADER: ${ENABLE_WEBSITE_JINAREADER:-true}
+       ENABLE_WEBSITE_FIRECRAWL: ${ENABLE_WEBSITE_FIRECRAWL:-true}
+       ENABLE_WEBSITE_WATERCRAWL: ${ENABLE_WEBSITE_WATERCRAWL:-true}
++    networks:
++      - default
++      - dify-network
+ 
+   # The PostgreSQL database.
+   db_postgres:
+@@ -1082,6 +1088,9 @@ services:
+       seekdb:
+         condition: service_healthy
+         required: false
++    networks:
++      - default
++      - dify-network
+ 
+   # ssrf_proxy server
+   # for more information, please refer to
+@@ -1668,6 +1677,10 @@ networks:
+   opensearch-net:
+     driver: bridge
+     internal: true
++  # External network for communication with enterprise services
++  dify-network:
++    external: true
++    name: dify-network
+ 
+ volumes:
+   oradata:
+-- 
+2.50.1 (Apple Git-155)
+
+
+From 786324e64a2d21b20cf27c7d789a7ac60712c136 Mon Sep 17 00:00:00 2001
+From: Bot-lucas-hsueh <lucas_hsueh_bot@outlook.com>
+Date: Thu, 23 Apr 2026 23:17:40 +0800
+Subject: [PATCH 2/2] network: add dify-network to nginx service
+
+Enables nginx to reach web service on dify-network IP where
+Next.js is listening, fixing 502 errors for /apps and other routes.
+---
+ docker/docker-compose.yaml | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/docker/docker-compose.yaml b/docker/docker-compose.yaml
+index 736a669..6c819f7 100644
+--- a/docker/docker-compose.yaml
++++ b/docker/docker-compose.yaml
+@@ -1182,6 +1182,9 @@ services:
+     ports:
+       - "${EXPOSE_NGINX_PORT:-80}:${NGINX_PORT:-80}"
+       - "${EXPOSE_NGINX_SSL_PORT:-443}:${NGINX_SSL_PORT:-443}"
++    networks:
++      - default
++      - dify-network
+ 
+   # The Weaviate vector store.
+   weaviate:
+-- 
+2.50.1 (Apple Git-155)
+
