@@ -71,7 +71,7 @@ export class DifyClient {
       spec: {
         ...dsl.spec,
         authentication: dsl.spec.authentication
-          ? { ...dsl.spec.authentication, _rotatedAt: new Date().toISOString() }
+          ? { ...dsl.spec.authentication, _rotatedAt: new Date().toISOString() } as typeof dsl.spec.authentication
           : dsl.spec.authentication,
       },
     };
