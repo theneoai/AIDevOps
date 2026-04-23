@@ -31,7 +31,18 @@ export async function deployCommand(name: string, options: DeployOptions): Promi
   }
 
   const componentsDir = config.componentsDir;
-  const filePath = path.join(componentsDir, `${name}.yml`);
+  let filePath: string;
+
+  // Check if name contains a path separator (e.g., "templates/foo/component.yml")
+  if (name.includes('/') || name.includes('\\')) {
+    filePath = path.isAbsolute(name) ? name : path.join(componentsDir, name);
+    // Ensure it ends with .yml
+    if (!filePath.endsWith('.yml') && !filePath.endsWith('.yaml')) {
+      filePath = `${filePath}.yml`;
+    }
+  } else {
+    filePath = path.join(componentsDir, `${name}.yml`);
+  }
 
   if (!fs.existsSync(filePath)) {
     console.error(chalk.red(`Error: Component not found: ${filePath}`));
