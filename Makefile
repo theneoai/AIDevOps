@@ -180,6 +180,22 @@ dify-up:
 	@echo "=== 自动注册企业自研工具到 Dify ==="
 	@sleep 10
 	@$(MAKE) register-tools 2>/dev/null || echo "⚠️  工具注册失败，请手动运行: make register-tools"
+	@echo ""
+	@echo "=== 等待 Dify 就绪 ==="
+	@for i in $$(seq 1 30); do \
+		if curl -sf http://localhost/console/api/health >/dev/null 2>&1; then \
+			echo "✓ Dify API 已就绪"; \
+			break; \
+		fi; \
+		if [ $$i -eq 30 ]; then \
+			echo "⚠️  Dify API 未响应，可能仍在启动中"; \
+		fi; \
+		sleep 2; \
+	done
+	@echo ""
+	@echo "=== Dify 启动完成 ==="
+	@echo "访问 http://localhost/apps 创建应用"
+	@echo "如需导入 DevKit 组件，请通过 Dify UI 手动导入 YAML 文件"
 
 dify-down:
 	@echo "=== 停止 Dify 官方服务 ==="
