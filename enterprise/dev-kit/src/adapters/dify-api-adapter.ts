@@ -62,6 +62,22 @@ export const DIFY_V1_PATHS: DifyApiPaths = {
   plugin: (pluginId) => `/v1/workspaces/current/plugins/${encodeURIComponent(pluginId)}`,
 };
 
+// Console API paths for tool provider management (requires session auth)
+export const DIFY_CONSOLE_API_PATHS: DifyApiPaths = {
+  info: '/v1/info',
+  toolProviders: '/console/api/workspaces/current/tool-providers',
+  toolProviderApi: '/console/api/workspaces/current/tool-provider/api/add',
+  toolProviderMcp: '/console/api/workspaces/current/tool-provider/mcp/add',
+  toolProvider: (id) => `/console/api/workspaces/current/tool-provider/${id}`,
+  workflowRun: '/v1/workflows/run',
+  workflowTaskStop: (taskId) => `/v1/workflows/tasks/${taskId}/stop`,
+  appMcpPublish: (appId) => `/v1/apps/${appId}/mcp/publish`,
+  appMcpInfo: (appId) => `/v1/apps/${appId}/mcp`,
+  plugins: '/v1/workspaces/current/plugins',
+  pluginInstall: '/v1/workspaces/current/plugins/install',
+  plugin: (pluginId) => `/v1/workspaces/current/plugins/${encodeURIComponent(pluginId)}`,
+};
+
 // ─────────────────────────────────────────────────────────────
 // Version Config (passed from BackendConfig)
 // ─────────────────────────────────────────────────────────────

@@ -312,6 +312,24 @@ services:
     # 失败时自动重试（最多 5 次），确保 Dify 启动慢时不会遗漏注册
     restart: on-failure:5
 
+  # DevKit 组件自动导入
+  import-devkit:
+    build:
+      context: ./enterprise/scripts/import-devkit
+    container_name: import-devkit
+    volumes:
+      - ./enterprise/components:/app/enterprise/components:ro
+    environment:
+      - DIFY_CONSOLE_URL=${DIFY_CONSOLE_URL:-http://nginx}
+      - DIFY_CONSOLE_EMAIL=${DIFY_CONSOLE_EMAIL:-}
+      - DIFY_CONSOLE_PASSWORD=${DIFY_CONSOLE_PASSWORD:-}
+      - COMPONENTS_DIR=/app/enterprise/components
+      - MAX_RETRIES=${IMPORT_DEVKIT_MAX_RETRIES:-30}
+      - RETRY_DELAY=${IMPORT_DEVKIT_RETRY_DELAY:-10}
+    networks:
+      - dify-network
+    restart: "no"
+
 volumes:
   quota_db_data:
     driver: local

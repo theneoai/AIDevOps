@@ -148,6 +148,7 @@ devkit-status-online:
 
 # ─── Dify 官方服务 ───
 dify-up:
+	@set -a && . ./.env && set +a
 	@echo "=== 启动 Dify 官方服务 ==="
 	@if [ ! -d "dify/docker" ]; then \
 		echo "⚠️  dify/ 子模块未初始化"; \
@@ -183,7 +184,7 @@ dify-up:
 	@echo ""
 	@echo "=== 等待 Dify 就绪 ==="
 	@for i in $$(seq 1 30); do \
-		if curl -sf http://localhost/console/api/health >/dev/null 2>&1; then \
+		if curl -sf http://localhost/console/api/ping >/dev/null 2>&1; then \
 			echo "✓ Dify API 已就绪"; \
 			break; \
 		fi; \
@@ -193,9 +194,16 @@ dify-up:
 		sleep 2; \
 	done
 	@echo ""
+	@echo "=== 自动导入 DevKit 组件到 Dify ==="
+	@if [ -n "$$DIFY_CONSOLE_EMAIL" ] && [ -n "$$DIFY_CONSOLE_PASSWORD" ]; then \
+		docker compose run --rm import-devkit; \
+	else \
+		echo "⚠️  未设置 DIFY_CONSOLE_EMAIL 或 DIFY_CONSOLE_PASSWORD，跳过 DevKit 组件导入"; \
+		echo "如需自动导入，请设置环境变量后运行: docker compose run --rm import-devkit"; \
+	fi
+	@echo ""
 	@echo "=== Dify 启动完成 ==="
 	@echo "访问 http://localhost/apps 创建应用"
-	@echo "如需导入 DevKit 组件，请通过 Dify UI 手动导入 YAML 文件"
 
 dify-down:
 	@echo "=== 停止 Dify 官方服务 ==="
