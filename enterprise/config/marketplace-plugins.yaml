@@ -1,0 +1,16 @@
+# Marketplace Plugins Configuration
+# 每次 make up-all 会自动安装并启用这些插件
+# 格式: plugin_unique_identifier
+
+marketplace_plugins:
+  # MCP Server 插件 (如果需要)
+  # - dify-marketplace-plugin-mcp-server
+
+  # 其他需要的插件
+  # - your-plugin-identifier
+
+# GitHub 插件 (直接通过 GitHub 安装)
+github_plugins:
+  # - repo: owner/repo
+  #   version: latest
+  #   package: plugin-package-name

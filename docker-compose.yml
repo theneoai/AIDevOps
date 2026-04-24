@@ -319,6 +319,7 @@ services:
     container_name: import-devkit
     volumes:
       - ./enterprise/components:/app/enterprise/components:ro
+      - ./enterprise/workflows:/app/enterprise/workflows:ro
     environment:
       - DIFY_CONSOLE_URL=${DIFY_CONSOLE_URL:-http://nginx}
       - DIFY_CONSOLE_EMAIL=${DIFY_CONSOLE_EMAIL:-}
