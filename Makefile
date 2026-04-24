@@ -199,15 +199,8 @@ dify-up:
 		sleep 2; \
 	done
 	@echo ""
-	@echo "=== 自动导入 DevKit 组件到 Dify ==="
-	@if [ -n "$$DIFY_CONSOLE_EMAIL" ] && [ -n "$$DIFY_CONSOLE_PASSWORD" ]; then \
-		docker compose run --rm import-devkit; \
-	else \
-		echo "⚠️  未设置 DIFY_CONSOLE_EMAIL 或 DIFY_CONSOLE_PASSWORD，跳过 DevKit 组件导入"; \
-		echo "如需自动导入，请设置环境变量后运行: docker compose run --rm import-devkit"; \
-	fi
-	@echo ""
 	@echo "=== Dify 启动完成 ==="
+	@echo "访问 http://localhost/install 进行初始设置"
 	@echo "访问 http://localhost/apps 创建应用"
 
 dify-down:
