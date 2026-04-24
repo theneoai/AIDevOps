@@ -173,6 +173,11 @@ dify-up:
 		echo "  ⚠️  补丁文件不存在，跳过"; \
 	fi
 	@cd dify/docker && docker-compose -f docker-compose.yaml -f docker-compose.middleware.yaml up -d
+	@echo "=== 修复 Dify Web/Nginx 网络冲突 ==="
+	@sleep 3
+	@docker network disconnect dify-network docker-web-1 2>/dev/null || true
+	@docker restart docker-nginx-1 2>/dev/null || true
+	@echo "✓ 网络冲突已修复"
 	@echo "=== 连接企业服务到 Dify 网络 ==="
 	@sleep 5
 	@docker network connect docker_default mcp-wechat 2>/dev/null || docker network disconnect docker_default mcp-wechat 2>/dev/null && docker network connect docker_default mcp-wechat 2>/dev/null || true
