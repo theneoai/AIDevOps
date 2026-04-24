@@ -45,8 +45,8 @@ def devkit_to_dify_workflow(component: dict) -> dict:
 
     app_mode = {
         "workflow": "workflow",
-        "chatflow": "chatflow",
-        "agent": "agent",
+        "chatflow": "advanced-chat",
+        "agent": "workflow",
     }.get(kind, "workflow")
 
     nodes = []
@@ -69,7 +69,7 @@ def devkit_to_dify_workflow(component: dict) -> dict:
             "use_icon_as_answer_icon": False,
         },
         "kind": "app",
-        "version": "0.1.0",
+        "version": "0.6.0",
         "workflow": {
             "conversation_variables": [],
             "environment_variables": [],

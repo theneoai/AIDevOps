@@ -231,7 +231,7 @@ class DevKitConverter:
         spec = component.get("spec", {})
         metadata = component.get("metadata", {})
 
-        app_mode_map = {"workflow": "workflow", "chatflow": "chatflow", "agent": "agent"}
+        app_mode_map = {"workflow": "workflow", "chatflow": "advanced-chat", "agent": "workflow"}
         app_mode = app_mode_map.get(kind, "workflow")
 
         if kind == "workflow":
@@ -253,7 +253,7 @@ class DevKitConverter:
                 "use_icon_as_answer_icon": False,
             },
             "kind": "app",
-            "version": "0.1.0",
+            "version": "0.6.0",
             "workflow": {
                 "conversation_variables": [],
                 "environment_variables": [],
